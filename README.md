@@ -4,7 +4,7 @@ This repository contains the implementation accompanying the paper
 
 **Neural Regression and Randomized Optimization for Impulse Control Problems**
 
-by **Lokmane Abbas Turki, Aurélien Grenard, Idris Kharroubi, Qinghua Li, and Antonio Ocello**.
+by **Lokmane Abbas Turki, Aurélien Grenard, Idris Kharroubi and Qinghua Li**.
 
 The code implements the neural Regression Monte Carlo methodology and randomized optimization procedures introduced in the paper for solving multidimensional impulse control problems.
 

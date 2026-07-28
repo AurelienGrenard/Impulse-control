@@ -1,92 +1,125 @@
-# Neural Regression and Randomized Optimization for Impulse Control Problems
+# Impulse Control — modular implementation
 
-This repository contains the implementation accompanying the paper
+This directory is a clean, notebook-light reorganization of the original
+`Impulse-control-main` experiments accompanying *Neural Regression and
+Randomized Optimization for Impulse Control Problems*.
 
-**Neural Regression and Randomized Optimization for Impulse Control Problems**
+The financial definitions, Monte Carlo rollouts, randomized optimizers,
+training loops, network architectures, time grids and exact solutions are
+unchanged. Numerical function bodies were migrated verbatim from the published
+notebooks; `tools/build_refactored_project.py` records that migration.
 
-by **Lokmane Abbas Turki, Aurélien Grenard, Idris Kharroubi and Qinghua Li**.
-
-The code implements the neural Regression Monte Carlo methodology and randomized optimization procedures introduced in the paper for solving multidimensional impulse control problems.
-
-## Citation
-
-If you use this code, results, figures, or ideas from this repository in academic work, please cite the associated paper and acknowledge the original authors.
-
-## Repository Structure
-
-The repository contains two application examples:
+## Structure
 
 ```text
-Harvesting/
-Dividend/
+impulse_control/
+  common.py              shared optimization and time-grid configuration
+  exact_dividend.py      exact dividend solution
+  exact_harvesting.py    exact harvesting solution
+  dividend.py            dividend problem and numerical algorithms
+  harvesting.py          harvesting problem and numerical algorithms
+  saving.py              common checkpoint save/load API
+  plotting.py            common white-background figure style and public plots
+  train_dividend.py      dividend training CLI
+  train_harvesting.py    harvesting training CLI
+notebooks/
+  dividend_limited_d1.ipynb
+  dividend_limited_d4.ipynb
+  dividend_unlimited_d1.ipynb
+  dividend_unlimited_d6.ipynb
+  harvesting_limited_d1.ipynb
+  harvesting_limited_d4.ipynb
+  harvesting_unlimited_d1.ipynb
+  harvesting_unlimited_d6.ipynb
+runs/                    supplied pretrained checkpoints
+tests/
 ```
 
-Each directory contains:
-
-```text
-runs/
-```
-
-which stores pretrained models used in the numerical experiments presented in the paper.
-
-In addition, each project provides four training notebooks:
-
-```text
-1D unconstrained impulse control
-6D unconstrained impulse control
-1D bounded impulse control
-4D bounded impulse control
-```
-
-The notebooks are organized in a similar way. For a given application, all notebooks share the same code structure up to the section entitled:
-
-```text
-Learning the models
-```
-
-Only the training configuration and problem dimension differ between experiments.
-
-## Pretrained Models
-
-Pretrained neural networks are provided in the `runs` directories.
-
-Users interested only in reproducing the figures and simulations may directly load the provided models and skip the training sections.
-
-Users wishing to reproduce the complete numerical experiments may rerun the training cells from scratch.
+The notebooks are presentation layers only: one loading cell and one plotting
+cell. They do not contain numerical or drawing implementation.
 
 ## Environment
 
-The experiments were conducted with:
-
-```text
-Python      3.11.2
-PyTorch     2.3.1
-CUDA        12.1
-Matplotlib  3.10.8
-NumPy       2.4.4
-```
-
-A compatible Conda environment can be created with:
+Python 3.11 and the same dependency versions as the original experiments are
+recommended:
 
 ```bash
 conda create -n ImpulseControl python=3.11
 conda activate ImpulseControl
-
-conda install pytorch=2.3.1 pytorch-cuda=12.1 matplotlib numpy -c pytorch -c nvidia
+conda install pytorch=2.3.1 pytorch-cuda=12.1 matplotlib numpy scipy jupyter -c pytorch -c nvidia
 ```
 
-## License
+Run commands from this directory. For a source checkout without installation:
 
-This code is provided for research and educational purposes.
+```bash
+export PYTHONPATH="$PWD"
+```
 
-Redistribution and modification are permitted provided that appropriate credit is given to the original authors.
+The pretrained checkpoints are tracked with Git LFS:
 
-## Contact
+```bash
+git lfs install
+git lfs pull
+```
 
-For questions regarding the implementation or the accompanying paper, please contact the authors.
+## Use a supplied model
 
-
+Limited experiments intentionally need only these two lines:
 
 ```python
+from impulse_control.saving import load_results_bundle
 
+bundle = load_results_bundle("runs/dividend_limited_d4.pt", map_location="cpu")
+all_results_loaded = bundle["bounded_results"]
 ```
+
+The unconstrained benchmark remains available inside `bundle`, but plotting
+functions consume it internally:
+
+```python
+from impulse_control.plotting import plot_limited_summary, plot_limited_paths
+
+plot_limited_summary(bundle, output="figures/dividend_values.png")
+plot_limited_paths(bundle, output_prefix="figures/dividend_limited_d4")
+```
+
+Unlimited checkpoints use:
+
+```python
+from impulse_control.saving import load_all_results_unlimited
+
+all_results_loaded = load_all_results_unlimited(
+    "runs/dividend_unlimited_d6.pt",
+    map_location="cpu",
+)
+```
+
+## Train and save a model
+
+The CLI keeps the notebook hyperparameters and algorithms. Select the
+application, mode, dimension and output checkpoint explicitly:
+
+```bash
+python -m impulse_control.train_dividend \
+  --mode limited \
+  --dimension 4 \
+  --output runs/dividend_limited_d4.pt
+
+python -m impulse_control.train_harvesting \
+  --mode unlimited \
+  --dimension 6 \
+  --output runs/harvesting_unlimited_d6.pt
+```
+
+Use another output name when preserving a supplied checkpoint. CUDA is selected
+when available; pass `--device cpu` to force CPU execution.
+
+## Validation
+
+```bash
+python -m compileall -q impulse_control
+pytest -q
+```
+
+The smoke tests load every supplied checkpoint, rebuild all networks and render
+the summary figures with a non-interactive backend.

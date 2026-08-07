@@ -2,7 +2,7 @@
 
 This directory is a clean, notebook-light reorganization of the original
 `Impulse-control-main` experiments accompanying *Neural Regression and
-Randomized Optimization for Impulse Control Problems*.
+Randomized Optimization for Impulse Control*.
 
 The financial definitions, Monte Carlo rollouts, randomized optimizers,
 training loops, network architectures, time grids and exact solutions are

@@ -10,11 +10,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from .reproducibility import seed_everything
 
-# Muted, colour-blind-safe hues derived from the Okabe--Ito palette.
-COLORS = ("#0072B2", "#009E73", "#D55E00", "#CC79A7", "#E69F00", "#56B4E9")
-INK = "#1B263B"
-REFERENCE = "#7A3E48"
+
+# Grayscale tones and dash patterns remain distinct in print.
+INK = "#111111"
+GRAYS = ("#2B2B2B", "#555555", "#777777", "#969696", "#B0B0B0", "#686868")
+LINESTYLES = (
+    "-",
+    (0, (7, 2.5)),
+    (0, (2, 2)),
+    (0, (7, 2, 1.5, 2)),
+    (0, (1, 1.5)),
+    (0, (4, 1.5, 1, 1.5)),
+)
 FIGURE_SIZE = (8.0, 5.0)
 ARTICLE_TEXT_SIZE = 20
 
@@ -41,7 +50,7 @@ def use_white_style() -> None:
             "axes.labelcolor": INK,
             "axes.grid": True,
             "axes.axisbelow": True,
-            "grid.color": "#D8DEE8",
+            "grid.color": "#D4D4D4",
             "grid.linewidth": 0.65,
             "grid.alpha": 0.55,
             "axes.spines.top": False,
@@ -63,7 +72,7 @@ def use_white_style() -> None:
             "legend.fontsize": 16,
             "legend.frameon": True,
             "legend.facecolor": "white",
-            "legend.edgecolor": "#D8DEE8",
+            "legend.edgecolor": "#C8C8C8",
             "legend.framealpha": 0.94,
             "legend.borderpad": 0.45,
             "legend.labelspacing": 0.45,
@@ -116,9 +125,9 @@ def plot_limited_summary(
     ax.plot(
         x,
         np.interp(x, unlimited["x_np_inf"], np.asarray(unlimited["V_np_inf"]).reshape(-1)),
-        color=REFERENCE,
+        color=INK,
         linewidth=2.3,
-        linestyle=(0, (6, 2, 1.5, 2)),
+        linestyle=(0, (9, 3)),
         label=r"$\hat V^{(\infty)}(0,x)$",
         zorder=5,
     )
@@ -126,7 +135,8 @@ def plot_limited_summary(
         ax.plot(
             x,
             np.interp(x, result["x"], np.asarray(result["V"]).reshape(-1)),
-            color=COLORS[index % len(COLORS)],
+            color=GRAYS[index % len(GRAYS)],
+            linestyle=LINESTYLES[index % len(LINESTYLES)],
             label=rf"$\hat V^{{({result['max_impulses']})}}(0,x)$",
         )
     ax.set(xlabel=r"Diagonal state $x$", ylabel=r"Estimated value $\hat V(0,x)$")
@@ -194,7 +204,7 @@ def plot_unlimited_summary(
         exact,
         color=INK,
         linewidth=2.35,
-        linestyle=(0, (7, 3)),
+        linestyle="-",
         label="Closed-form",
         zorder=5,
     )
@@ -202,7 +212,8 @@ def plot_unlimited_summary(
         ax.plot(
             x,
             np.interp(x, result["x"], np.asarray(result["V"]).reshape(-1)),
-            color=COLORS[index % len(COLORS)],
+            color=GRAYS[index % len(GRAYS)],
+            linestyle=LINESTYLES[(index + 1) % len(LINESTYLES)],
             label=rf"$T={result['T']:g}$",
         )
     ax.set(xlabel=r"Diagonal state $x$", ylabel=r"Estimated value $\hat V(0,x)$")
@@ -303,24 +314,30 @@ def plot_unlimited_policy_consistency(
         horizons,
         learned_means,
         yerr=learned_stds / np.sqrt(500),
-        fmt="s--",
-        markersize=6.5,
+        fmt="x-",
+        markersize=8.0,
+        markeredgewidth=1.8,
         linewidth=1.65,
         capsize=3,
         capthick=1.1,
         color=INK,
+        zorder=4,
         label="Learned policy",
     )
     ax.errorbar(
         horizons,
         band_means_np,
         yerr=band_stds_np / np.sqrt(n_sim_band),
-        fmt="^:",
-        markersize=6.5,
+        fmt="o--",
+        markersize=9.0,
+        markerfacecolor="white",
+        markeredgecolor=INK,
+        markeredgewidth=1.5,
         linewidth=1.65,
         capsize=3,
         capthick=1.1,
-        color=COLORS[0],
+        color="#5F5F5F",
+        zorder=3,
         label="Band policy",
     )
     ax.set(xlabel=r"Horizon $T$", ylabel=ylabel)
@@ -343,6 +360,7 @@ def plot_limited_paths(
     show: bool = True,
 ):
     """Plot shared-Brownian controlled paths without exposing bundle internals."""
+    seed_everything(seed)
     use_white_style()
     unlimited = bundle["unconstrained"]
     results = sorted(bundle["bounded_results"], key=lambda item: item["max_impulses"])
@@ -408,7 +426,8 @@ def plot_limited_paths(
             ax.plot(
                 time,
                 path,
-                color=(INK, *COLORS)[index % (len(COLORS) + 1)],
+                color=(INK, *GRAYS)[index % (len(GRAYS) + 1)],
+                linestyle=LINESTYLES[index % len(LINESTYLES)],
                 linewidth=1.15,
                 label=label,
                 alpha=0.92,

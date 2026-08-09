@@ -15,6 +15,9 @@ venv/
 .idea/
 .vscode/
 
+# Local manuscript copy
+Article.pdf
+
 # Temporary training outputs
 runs/*.tmp
 runs/*.part

@@ -90,7 +90,7 @@ def notebook(title: str, application: str, model: str, limited: bool) -> dict:
     command = (
         f"python -m impulse_control.train_{application} "
         f"--mode {'limited' if limited else 'unlimited'} "
-        f"--dimension <DIMENSION> --output runs/{application}_"
+        f"--dimension <DIMENSION> --seed 1234 --output runs/{application}_"
         f"{'limited' if limited else 'unlimited'}_d<DIMENSION>.pt"
     )
     path_seed = 124 if model == "dividend_limited_d1.pt" else 123

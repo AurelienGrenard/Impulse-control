@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the accompanying paper."
+title: "Neural Regression and Randomized Optimization for Impulse Control"
+type: software
+authors:
+  - family-names: Abbas Turki
+    given-names: Lokman
+  - family-names: Grenard
+    given-names: Aurélien
+  - family-names: Kharroubi
+    given-names: Idris
+  - family-names: Li
+    given-names: Qinghua
+  - family-names: Ocello
+    given-names: Antonio
+repository-code: "https://github.com/AurelienGrenard/Impulse-control"
+version: 1.0.0
+date-released: 2026-08-09
+license: BSD-3-Clause

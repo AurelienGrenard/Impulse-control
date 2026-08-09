@@ -6,6 +6,7 @@ import argparse
 import torch
 
 from .dividend import *
+from .reproducibility import seed_everything, write_run_manifest
 from .saving import save_all_results_unlimited, save_results_bundle
 
 
@@ -522,10 +523,21 @@ def main() -> None:
     parser.add_argument("--dimension", type=int, required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", default="cuda:0" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--smoke-test", action="store_true", help="Run the same pipeline with tiny validation sizes.")
     args = parser.parse_args()
+    seed_everything(args.seed)
     trainer = train_limited if args.mode == "limited" else train_unlimited
     trainer(args.dimension, args.output, args.device, args.smoke_test)
+    write_run_manifest(
+        args.output,
+        application="dividend",
+        mode=args.mode,
+        dimension=args.dimension,
+        seed=args.seed,
+        device=args.device,
+        smoke_test=args.smoke_test,
+    )
 
 
 if __name__ == "__main__":

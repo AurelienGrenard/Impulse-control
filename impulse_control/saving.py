@@ -13,6 +13,15 @@ import torch
 Tensor = torch.Tensor
 
 
+def _atomic_torch_save(payload: Dict[str, Any], path: str) -> None:
+    """Write a checkpoint without exposing a partially written target file."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(target.suffix + ".part")
+    torch.save(payload, temporary)
+    temporary.replace(target)
+
+
 def _resolve_path(path: str | os.PathLike[str]) -> Path:
     """Resolve project-relative checkpoint paths from scripts or notebooks."""
     candidate = Path(path)
@@ -231,12 +240,10 @@ def save_results_bundle(
             "V_np_inf": unconstrained.get("V_np_inf"),
             "V0_1_inf": unconstrained.get("V0_1_inf"),
         }
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    torch.save(payload, path)
+    _atomic_torch_save(payload, path)
 
 
 def save_all_results_unlimited(path: str, all_results: List[Dict[str, Any]]) -> None:
     """Save all unconstrained horizons in one checkpoint."""
     payload = {"version": 3, "mode": "unconstrained_multiT", "results": [_pack_result(r) for r in all_results]}
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    torch.save(payload, path)
+    _atomic_torch_save(payload, path)

@@ -35,6 +35,9 @@ def write_run_manifest(
     seed: int,
     device: str,
     smoke_test: bool,
+    activation: str = "leaky_relu",
+    negative_slope: float = 0.01,
+    randomized_candidates: int = 5_000,
 ) -> Path:
     """Write the seed, command parameters, and software versions beside a checkpoint."""
     target = Path(checkpoint).with_suffix(".json")
@@ -45,6 +48,13 @@ def write_run_manifest(
         "seed": seed,
         "device": device,
         "smoke_test": smoke_test,
+        "network": {
+            "depth": 3,
+            "width": 128,
+            "activation": activation,
+            "negative_slope": negative_slope,
+        },
+        "randomized_candidates": randomized_candidates,
         "software": {
             "python": platform.python_version(),
             "pytorch": torch.__version__,

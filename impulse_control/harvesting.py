@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, Tuple, List, Dict, Union
 
@@ -17,6 +18,14 @@ from .exact_harvesting import *
 Tensor = torch.Tensor
 
 Tensor = torch.Tensor
+
+
+def _format_duration(seconds: float) -> str:
+    """Format elapsed and estimated durations as hours, minutes, and seconds."""
+    total_seconds = max(0, int(round(seconds)))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 # Global experiment config
 @dataclass
@@ -1091,9 +1100,11 @@ def train_harvesting_unconstrained(
 
     # Q̂_k approximators, k = 0..K
     qhats: List[Optional[QNet]] = [None for _ in range(K + 1)]
+    training_started = time.perf_counter()
 
     # Backward induction: k = K-1, ..., 0
     for k in reversed(range(K)):
+        step_started = time.perf_counter()
         if cfg.verbose:
             print(f"\n[Unconstrained harvesting ND] Backward step k={k}/{K-1}")
 
@@ -1120,6 +1131,7 @@ def train_harvesting_unconstrained(
             y_chunks.append(yb)
 
         y = torch.cat(y_chunks, dim=0)  # [N_k]
+        target_elapsed = time.perf_counter() - step_started
         t_k = float(t_grid[k].item())
         # Local (undiscounted) regression target
         y_local = y / problem.discount(t_k)
@@ -1138,6 +1150,19 @@ def train_harvesting_unconstrained(
             fit_qnet(qnet, Xk, y_local, cfg.net, verbose=False, is_transfer=False)
 
         qhats[k] = qnet
+
+        if cfg.verbose:
+            step_elapsed = time.perf_counter() - step_started
+            regression_elapsed = step_elapsed - target_elapsed
+            completed_steps = K - k
+            elapsed = time.perf_counter() - training_started
+            eta = (elapsed / completed_steps) * (K - completed_steps)
+            print(
+                f"[Unconstrained harvesting ND] date {completed_steps}/{K} | "
+                f"targets={target_elapsed:.2f}s | regression={regression_elapsed:.2f}s | "
+                f"step={step_elapsed:.2f}s | elapsed={_format_duration(elapsed)} | "
+                f"ETA={_format_duration(eta)}"
+            )
 
         # Optional plotting: use ND-aware plotting (diagonal slice)
         if verbose:
@@ -1204,6 +1229,7 @@ def train_harvesting_bounded(
     qhats_bounded: List[List[Optional[QNet]]] = [
         [None for _ in range(K + 1)] for _ in range(max_imp + 1)
     ]
+    training_started = time.perf_counter()
 
     if cfg.verbose:
         print(f"\n[Bounded harvesting ND] Training with at most {max_imp} impulses.")
@@ -1228,6 +1254,7 @@ def train_harvesting_bounded(
 
     # Backward induction in time: k = K-1, ..., 0
     for k in reversed(range(K)):
+        step_started = time.perf_counter()
         if cfg.verbose:
             print(f"\n[Bounded harvesting ND] Backward step k={k}/{K-1}")
 
@@ -1281,6 +1308,17 @@ def train_harvesting_bounded(
         # For n > n_max_k, reuse the last available network at this time k
         for n in range(n_max_k + 1, max_imp + 1):
             qhats_bounded[n][k] = qhats_bounded[n_max_k][k]
+
+        if cfg.verbose:
+            completed_steps = K - k
+            elapsed = time.perf_counter() - training_started
+            step_elapsed = time.perf_counter() - step_started
+            eta = (elapsed / completed_steps) * (K - completed_steps)
+            print(
+                f"[Bounded harvesting ND] date {completed_steps}/{K} | "
+                f"step={step_elapsed:.2f}s | elapsed={_format_duration(elapsed)} | "
+                f"ETA={_format_duration(eta)}"
+            )
 
         # Optional plotting, on diagonal slice if d >= 2
         if verbose:

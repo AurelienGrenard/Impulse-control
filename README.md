@@ -26,6 +26,7 @@ impulse_control/
   train_dividend.py      dividend training command
   train_harvesting.py    harvesting training command
 notebooks/               executed presentation notebooks
+training_notebook/       eight independent GPU training notebooks
 runs/                    eight pretrained checkpoints stored with Git LFS
 figures/                 22 generated PNG files used in the paper panels
 reproducibility/         checksums and figure-to-artifact correspondence
@@ -38,6 +39,14 @@ The neural networks take the full state in dimension `d` as input. The
 randomized impulse search is also performed in dimension `d`; the implementation
 does not replace a multidimensional problem by a sum of one-dimensional neural
 solutions.
+
+## Training notebooks
+
+The [`training_notebook/`](training_notebook/) directory contains one notebook
+for each published checkpoint. Every notebook defaults to `cuda:0`, streams
+progress and ETA information, and writes resumable results to
+`retrained_runs/`. The device can be changed in one configuration cell when a
+different local GPU is required.
 
 ## Obtain the artifact
 
@@ -119,11 +128,12 @@ and serialized in each checkpoint. The principal settings are:
 - dividend: `mu=1`, `sigma=0.5`, `rho=0.05`, `lambda=0.2`, `c=0.5`;
 - harvesting: `mu=0.25`, `sigma=0.25`, `rho=0.05`, `alpha=1`, `x0=1`,
   `lambda=0.7`, `c=0.7`;
-- network: three hidden layers of width 128 with Softplus activation;
-- training: 20,000 iterations, batch size 8,192, 12,500 design points, and
-  eight Monte Carlo replications per design point;
-- randomized impulse search: 5,000 candidates for dividends and limited
-  harvesting, 6,000 candidates for unlimited harvesting;
+- network: three hidden layers of width 128 with LeakyReLU activation and
+  negative slope `0.01`;
+- training: 20,000 iterations and batch size 8,192; dimension `d=1` uses
+  100,000 design states with one rollout per state, while dimensions `d=4` and
+  `d=6` use 12,500 states with eight rollouts per state;
+- randomized impulse search: 5,000 candidates in every experiment;
 - intervention grid: `K=T`, with `T=25` for limited experiments and
   `T in {5, 10, 25, 50, 100}` for unlimited experiments;
 - limited budgets: `n in {1,...,5}` for dividends and `n in {1,...,4}` for

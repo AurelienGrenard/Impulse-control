@@ -38,6 +38,9 @@ def test_run_manifest_records_reproduction_context(tmp_path):
     payload = json.loads(target.read_text(encoding="utf-8"))
     assert payload["seed"] == 1234
     assert payload["dimension"] == 4
+    assert payload["network"]["activation"] == "leaky_relu"
+    assert payload["network"]["negative_slope"] == 0.01
+    assert payload["randomized_candidates"] == 5_000
     assert payload["software"]["pytorch"]
 
 
@@ -81,7 +84,9 @@ def test_seeded_dividend_training_cli_smoke(tmp_path, monkeypatch):
         )
         train_dividend.main()
         assert output.is_file()
-        assert json.loads(output.with_suffix(".json").read_text())["seed"] == 1234
+        manifest = json.loads(output.with_suffix(".json").read_text())
+        assert manifest["seed"] == 1234
+        assert manifest["network"]["activation"] == "leaky_relu"
 
     first, second = [torch.load(path, map_location="cpu", weights_only=False) for path in outputs]
 

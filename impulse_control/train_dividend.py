@@ -3,14 +3,45 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
+
 import torch
 
 from .dividend import *
 from .reproducibility import seed_everything, write_run_manifest
-from .saving import save_all_results_unlimited, save_results_bundle
+from .saving import (
+    load_all_results_unlimited,
+    load_results_bundle,
+    save_all_results_unlimited,
+    save_results_bundle,
+)
 
 
-def train_limited(dimension: int, output: str, requested_device: str, smoke_test: bool = False) -> None:
+def _validate_resume_result(
+    result: dict,
+    dimension: int,
+    activation: str,
+    negative_slope: float,
+) -> None:
+    """Reject a checkpoint that does not match the requested experiment."""
+    cfg = result.get("cfg", result.get("config"))
+    if cfg is None or cfg.dividend.state_dim != dimension:
+        raise RuntimeError("Resume checkpoint has a different dividend dimension.")
+    if cfg.net.activation != activation:
+        raise RuntimeError("Resume checkpoint has a different network activation.")
+    if activation == "leaky_relu" and cfg.net.negative_slope != negative_slope:
+        raise RuntimeError("Resume checkpoint has a different LeakyReLU slope.")
+
+
+def train_limited(
+    dimension: int,
+    output: str,
+    requested_device: str,
+    smoke_test: bool = False,
+    activation: str = "leaky_relu",
+    negative_slope: float = 0.01,
+    progress: bool = False,
+) -> None:
     # Device, dimension and global parameters
 
     """Train and save the bounded experiments for one dimension."""
@@ -24,15 +55,14 @@ def train_limited(dimension: int, output: str, requested_device: str, smoke_test
 
     # Hyperparameters
 
-    activation = "softplus"                                     # Network activation
     steps = 20_000                                              # Full training iterations
     transfer_steps = 100                                        # Transfer learning iterations
     batch_size = 8192                                           # Training batch size
     n_global = 5_000                                            # Random impulse candidates
     n_global_batch = 512                                        # Candidate batch size
     min_rel_impulse = 0.4                                       # Sparsification threshold
-    N_k = 12_500                                                # Design points per time step
-    M_k = 8                                                     # MC replications per design point
+    N_k = 100_000 if state_dim == 1 else 12_500                 # Regression states per date
+    M_k = 1 if state_dim == 1 else 8                            # Rollouts averaged per state
 
     if smoke_test:
         steps = 2
@@ -55,7 +85,7 @@ def train_limited(dimension: int, output: str, requested_device: str, smoke_test
     cfg_inf = ExperimentConfig(
         device=device,
         dtype=torch.float32,
-        verbose=False,
+        verbose=progress,
         max_impulses=-1,
 
         time=TimeGridConfig(
@@ -76,6 +106,7 @@ def train_limited(dimension: int, output: str, requested_device: str, smoke_test
 
         net=NetConfig(
             activation=activation,
+            negative_slope=negative_slope,
             steps=steps,
             transfer_steps=transfer_steps,
             batch_size=batch_size,
@@ -95,7 +126,19 @@ def train_limited(dimension: int, output: str, requested_device: str, smoke_test
         ),
     )
 
-    res_inf_nd = train_dividend_unconstrained(cfg_inf, verbose=False)
+    output_path = Path(output)
+    loaded_unconstrained = None
+    if output_path.is_file():
+        loaded_bundle = load_results_bundle(output, map_location=device)
+        loaded_unconstrained = loaded_bundle["unconstrained"]
+        all_results = loaded_bundle["bounded_results"]
+        if loaded_unconstrained is None:
+            raise RuntimeError("Resume checkpoint is missing its unconstrained result.")
+        _validate_resume_result(loaded_unconstrained, state_dim, activation, negative_slope)
+        for result in all_results:
+            _validate_resume_result(result, state_dim, activation, negative_slope)
+
+    res_inf_nd = loaded_unconstrained or train_dividend_unconstrained(cfg_inf, verbose=False)
 
     problem_inf = res_inf_nd["problem"]
     t_grid_inf  = res_inf_nd["t_grid"]
@@ -158,10 +201,16 @@ def train_limited(dimension: int, output: str, requested_device: str, smoke_test
     res_inf_nd["x_np_inf"] = x_np_inf
     res_inf_nd["V_np_inf"] = V_np_inf
     res_inf_nd["V0_1_inf"] = V0_1_inf
+    save_results_bundle(output, bounded_results=all_results, unconstrained=res_inf_nd)
 
 
     # Bounded dividend ND
+    completed_budgets = {int(result["max_impulses"]) for result in all_results}
     for n_imp in max_imp_list:
+
+        if n_imp in completed_budgets:
+            print(f"Skipping completed dividend budget n={n_imp}.")
+            continue
 
         print(
             f"\n=== Dividend ND (d = {state_dim}), "
@@ -171,7 +220,7 @@ def train_limited(dimension: int, output: str, requested_device: str, smoke_test
         cfg_n = ExperimentConfig(
             device=device,
             dtype=torch.float32,
-            verbose=False,
+            verbose=progress,
             max_impulses=n_imp,
 
             time=TimeGridConfig(
@@ -192,6 +241,7 @@ def train_limited(dimension: int, output: str, requested_device: str, smoke_test
 
             net=NetConfig(
                 activation=activation,
+                negative_slope=negative_slope,
                 steps=steps,
                 transfer_steps=transfer_steps,
                 batch_size=batch_size,
@@ -315,11 +365,21 @@ def train_limited(dimension: int, output: str, requested_device: str, smoke_test
             }
         )
 
+        save_results_bundle(output, bounded_results=all_results, unconstrained=res_inf_nd)
+
     save_results_bundle(output, bounded_results=all_results, unconstrained=res_inf_nd)
 
 
 
-def train_unlimited(dimension: int, output: str, requested_device: str, smoke_test: bool = False) -> None:
+def train_unlimited(
+    dimension: int,
+    output: str,
+    requested_device: str,
+    smoke_test: bool = False,
+    activation: str = "leaky_relu",
+    negative_slope: float = 0.01,
+    progress: bool = False,
+) -> None:
     # Device, dimension and global parameters
 
     """Train and save the unconstrained experiments for one dimension."""
@@ -332,15 +392,14 @@ def train_unlimited(dimension: int, output: str, requested_device: str, smoke_te
 
     # Hyperparameters
 
-    activation = "softplus"                                     # Network activation
     steps = 20_000                                              # Full training iterations
     transfer_steps = 100                                        # Transfer learning iterations
     batch_size = 8192                                           # Training batch size
     n_global = 5_000                                            # Random impulse candidates
     n_global_batch = 512                                        # Candidate batch size
     min_rel_impulse = 0.4                                       # Sparsification threshold
-    N_k = 12_500                                                # Design points per time step
-    M_k = 8                                                     # MC replications per design point
+    N_k = 100_000 if d_state == 1 else 12_500                   # Regression states per date
+    M_k = 1 if d_state == 1 else 8                              # Rollouts averaged per state
 
     if smoke_test:
         steps = 2
@@ -356,8 +415,19 @@ def train_unlimited(dimension: int, output: str, requested_device: str, smoke_te
     x_min = 0.0                                                 # Design domain lower bound
     x_max = 8.0                                                 # Design domain upper bound
 
+    output_path = Path(output)
+    if output_path.is_file():
+        all_results = load_all_results_unlimited(output, map_location=device)
+        for result in all_results:
+            _validate_resume_result(result, d_state, activation, negative_slope)
+    completed_horizons = {float(result["T"]) for result in all_results}
+
 
     for T_val in T_list:
+
+        if T_val in completed_horizons:
+            print(f"Skipping completed dividend horizon T={T_val:g}.")
+            continue
 
         print(f"\n=== Dividend ND, training for T = {T_val} (d = {d_state}) ===")
 
@@ -365,7 +435,7 @@ def train_unlimited(dimension: int, output: str, requested_device: str, smoke_te
         cfg_T = ExperimentConfig(
             device=device,
             dtype=torch.float32,
-            verbose=False,
+            verbose=progress,
 
             time=TimeGridConfig(
                 T=T_val,
@@ -388,6 +458,7 @@ def train_unlimited(dimension: int, output: str, requested_device: str, smoke_te
                 depth=3,
                 width=128,
                 activation=activation,
+                negative_slope=negative_slope,
                 steps=steps,
                 transfer_steps=transfer_steps,
                 batch_size=batch_size,
@@ -512,6 +583,8 @@ def train_unlimited(dimension: int, output: str, requested_device: str, smoke_te
             }
         )
 
+        save_all_results_unlimited(output, all_results)
+
     save_all_results_unlimited(output, all_results)
 
 
@@ -524,11 +597,32 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", default="cuda:0" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--seed", type=int, default=1234)
+    parser.add_argument(
+        "--activation",
+        choices=("leaky_relu", "softplus"),
+        default="leaky_relu",
+        help="Continuation-network activation (default: leaky_relu).",
+    )
+    parser.add_argument(
+        "--negative-slope",
+        type=float,
+        default=0.01,
+        help="LeakyReLU negative slope (default: 0.01).",
+    )
+    parser.add_argument("--progress", action="store_true", help="Report progress and ETA after every date.")
     parser.add_argument("--smoke-test", action="store_true", help="Run the same pipeline with tiny validation sizes.")
     args = parser.parse_args()
     seed_everything(args.seed)
     trainer = train_limited if args.mode == "limited" else train_unlimited
-    trainer(args.dimension, args.output, args.device, args.smoke_test)
+    trainer(
+        args.dimension,
+        args.output,
+        args.device,
+        args.smoke_test,
+        args.activation,
+        args.negative_slope,
+        args.progress,
+    )
     write_run_manifest(
         args.output,
         application="dividend",
@@ -537,6 +631,9 @@ def main() -> None:
         seed=args.seed,
         device=args.device,
         smoke_test=args.smoke_test,
+        activation=args.activation,
+        negative_slope=args.negative_slope,
+        randomized_candidates=16 if args.smoke_test else 5_000,
     )
 
 

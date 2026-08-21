@@ -21,3 +21,4 @@ Article.pdf
 # Temporary training outputs
 runs/*.tmp
 runs/*.part
+retrained_runs/

@@ -144,7 +144,7 @@ def train_limited(
     t_grid_inf  = res_inf_nd["t_grid"]
     qhats_inf   = res_inf_nd["qhats"]
 
-    # Evaluate V∞(0,x)
+    # Evaluate the unconstrained value at the initial state.
     x_min_plot_inf = cfg_inf.design.x_min_plot
     x_max_plot_inf = cfg_inf.design.x_max_plot
     n_x_inf = 400
@@ -194,7 +194,7 @@ def train_limited(
 
     print(
         f"UNCONSTRAINED | "
-        f"V_hat^∞(0,(1,...,1)) = {V0_1_inf:10.6f}"
+        f"V_hat^infinity(0,(1,...,1)) = {V0_1_inf:10.6f}"
     )
 
     # Useful for plots later

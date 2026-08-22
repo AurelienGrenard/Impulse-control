@@ -121,7 +121,7 @@ def preflight(task: TrainingTask, device: str = DEFAULT_DEVICE) -> None:
     print(f"Repository: {REPOSITORY_ROOT}")
     print(f"Task: {task.stem} [{state}]")
     print(f"Output: {task.output}")
-    print(f"Device: {device} — {torch.cuda.get_device_name(device_index)}")
+    print(f"Device: {device} - {torch.cuda.get_device_name(device_index)}")
     print(f"PyTorch: {torch.__version__}; CUDA runtime: {torch.version.cuda}")
     print(f"Seed: {SEED}")
     print(f"Network: 3 x 128, {ACTIVATION}, negative slope {NEGATIVE_SLOPE}")
@@ -155,6 +155,8 @@ def run_training(task: TrainingTask, device: str = DEFAULT_DEVICE) -> Path:
     environment = os.environ.copy()
     environment["PYTHONHASHSEED"] = str(SEED)
     environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    environment["PYTHONIOENCODING"] = "utf-8"
+    environment["PYTHONUTF8"] = "1"
     environment["MPLCONFIGDIR"] = str(OUTPUT_ROOT / ".matplotlib")
     Path(environment["MPLCONFIGDIR"]).mkdir(parents=True, exist_ok=True)
 
@@ -171,6 +173,7 @@ def run_training(task: TrainingTask, device: str = DEFAULT_DEVICE) -> Path:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
             errors="replace",
             bufsize=1,
         )

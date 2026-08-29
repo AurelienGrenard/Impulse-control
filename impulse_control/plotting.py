@@ -272,7 +272,7 @@ def plot_unlimited_policy_consistency(
         from .exact_harvesting import simulate_band_policy_nd
 
         params = cfg.harvesting
-        n_sim_band = 10
+        n_sim_band = 500
         score_key = "COST_total_per_path"
         ylabel = "Cost"
 
@@ -305,6 +305,9 @@ def plot_unlimited_policy_consistency(
 
     horizons = np.asarray([result["T"] for result in ordered], dtype=float)
     learned_means = np.asarray([result["mc_mean_NN"] for result in ordered], dtype=float)
+    learned_counts = np.asarray(
+        [result.get("mc_n_NN", 500) for result in ordered], dtype=float
+    )
     learned_stds = np.asarray([result["mc_std_NN"] for result in ordered], dtype=float)
     band_means_np = np.asarray(band_means)
     band_stds_np = np.asarray(band_stds)
@@ -313,7 +316,7 @@ def plot_unlimited_policy_consistency(
     ax.errorbar(
         horizons,
         learned_means,
-        yerr=learned_stds / np.sqrt(500),
+        yerr=1.96 * learned_stds / np.sqrt(learned_counts),
         fmt="x-",
         markersize=8.0,
         markeredgewidth=1.8,
@@ -327,7 +330,7 @@ def plot_unlimited_policy_consistency(
     ax.errorbar(
         horizons,
         band_means_np,
-        yerr=band_stds_np / np.sqrt(n_sim_band),
+        yerr=1.96 * band_stds_np / np.sqrt(n_sim_band),
         fmt="o--",
         markersize=9.0,
         markerfacecolor="white",

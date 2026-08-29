@@ -14,8 +14,13 @@ from pathlib import Path
 
 import torch
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from impulse_control.reproducibility import published_training_parameters
+
+
 OUTPUT_ROOT = REPOSITORY_ROOT / "retrained_runs"
 DEFAULT_DEVICE = "cuda:0"
 SEED = 1234
@@ -125,7 +130,26 @@ def preflight(task: TrainingTask, device: str = DEFAULT_DEVICE) -> None:
     print(f"PyTorch: {torch.__version__}; CUDA runtime: {torch.version.cuda}")
     print(f"Seed: {SEED}")
     print(f"Network: 3 x 128, {ACTIVATION}, negative slope {NEGATIVE_SLOPE}")
-    print("Randomized impulse candidates: 5000")
+    if task.mode == "unlimited":
+        print("Published horizon schedule:")
+        for horizon in (5.0, 10.0, 25.0, 50.0, 100.0):
+            settings = published_training_parameters(
+                task.application, task.mode, task.dimension, horizon
+            )
+            print(
+                f"  T={horizon:g}: N_k={settings['design_states']}, "
+                f"M_k={settings['rollouts_per_state']}, "
+                f"candidates={settings['randomized_candidates']}, "
+                f"transfer_steps={settings['transfer_steps']}"
+            )
+    else:
+        settings = published_training_parameters(
+            task.application, task.mode, task.dimension
+        )
+        print(
+            f"N_k={settings['design_states']}, M_k={settings['rollouts_per_state']}, "
+            f"randomized candidates={settings['randomized_candidates']}"
+        )
 
 
 def run_training(task: TrainingTask, device: str = DEFAULT_DEVICE) -> Path:
@@ -148,7 +172,18 @@ def run_training(task: TrainingTask, device: str = DEFAULT_DEVICE) -> Path:
         "device": device,
         "activation": ACTIVATION,
         "negative_slope": NEGATIVE_SLOPE,
-        "randomized_candidates": 5_000,
+        "training_schedule": (
+            {
+                f"T={horizon:g}": published_training_parameters(
+                    task.application, task.mode, task.dimension, horizon
+                )
+                for horizon in (5.0, 10.0, 25.0, 50.0, 100.0)
+            }
+            if task.mode == "unlimited"
+            else published_training_parameters(
+                task.application, task.mode, task.dimension
+            )
+        ),
     }
     _write_json(manifest_path, manifest)
 

@@ -1,7 +1,7 @@
 # Neural Regression and Randomized Optimization for Impulse Control
 
 This repository contains the code, pretrained checkpoints, and post-processing
-notebooks required to reproduce the numerical results in the paper *Neural
+scripts required to reproduce the numerical results in the paper *Neural
 Regression and Randomized Optimization for Impulse Control*.
 
 Authors: Lokman Abbas Turki, Aurélien Grenard, Idris Kharroubi, Qinghua Li, and
@@ -25,10 +25,9 @@ impulse_control/
   reproducibility.py     seeds and run manifests
   train_dividend.py      dividend training command
   train_harvesting.py    harvesting training command
-notebooks/               executed presentation notebooks
 training_notebook/       eight independent GPU training notebooks
 runs/                    eight pretrained checkpoints stored with Git LFS
-figures/                 22 generated PNG files used in the paper panels
+figures/                 22 generated PNG files, including all paper panels
 reproducibility/         checksums and figure-to-artifact correspondence
 tests/                   checkpoint and plotting smoke tests
 tools/                   figure reproduction and artifact verification commands
@@ -95,15 +94,10 @@ Then regenerate all 22 PNG files from the supplied checkpoints:
 MPLBACKEND=Agg python tools/reproduce_figures.py
 ```
 
-This command overwrites the files in `figures/` without retraining. The eight
-executed notebooks display the same results and may be opened directly:
+This command overwrites the files in `figures/` without retraining.
 
-```bash
-jupyter lab notebooks/
-```
-
-The complete correspondence between article panels, checkpoints, notebooks,
-and PNG files is recorded in
+The complete correspondence between article panels, checkpoints, and PNG
+files is recorded in
 [`reproducibility/figure-map.csv`](reproducibility/figure-map.csv). There are no
 numerical tables in the manuscript.
 
@@ -130,17 +124,20 @@ and serialized in each checkpoint. The principal settings are:
   `lambda=0.7`, `c=0.7`;
 - network: three hidden layers of width 128 with LeakyReLU activation and
   negative slope `0.01`;
-- training: 20,000 iterations and batch size 8,192; dimension `d=1` uses
-  100,000 design states with one rollout per state, while dimensions `d=4` and
-  `d=6` use 12,500 states with eight rollouts per state;
-- randomized impulse search: 5,000 candidates in every experiment;
+- training: 20,000 iterations and batch size 8,192; the base allocation is
+  `(N_k,M_k)=(100000,1)` for `d=1` and `(12500,8)` for `d in {4,6}`;
+- selected `d=6` components use `(N_k,M_k)=(50000,2)`, 500 transfer steps,
+  transfer learning rate `5e-4`, and 6,000 randomized candidates: dividend at
+  `T=5`, and harvesting at `T in {10,25,50,100}`;
+- all other components use 100 transfer steps and 5,000 randomized candidates;
 - intervention grid: `K=T`, with `T=25` for limited experiments and
   `T in {5, 10, 25, 50, 100}` for unlimited experiments;
 - limited budgets: `n in {1,...,5}` for dividends and `n in {1,...,4}` for
   harvesting.
 
-The source entry points remain the authoritative specification, including
-application-specific evaluation sample sizes and transfer-learning settings.
+The exact horizon-by-horizon schedule is recorded in
+[`reproducibility/training-configurations.json`](reproducibility/training-configurations.json)
+and serialized in every checkpoint.
 
 ## Retrain the published experiments
 

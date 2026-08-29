@@ -165,7 +165,17 @@ def _rebuild_result(item: Dict[str, Any], application: str, map_location: str) -
         qhats = [network(state) for state in pack["state_dicts"]]
     grid = item.get("t_grid", cfg.t_grid).to(map_location, dtype=cfg.dtype)
     result = {"cfg": cfg, "problem": problem, "t_grid": grid, "qhats": qhats}
-    for key in ("T", "max_impulses", "V0_1", "mc_mean_NN", "mc_std_NN", "x", "V"):
+    for key in (
+        "T",
+        "max_impulses",
+        "V0_1",
+        "mc_mean_NN",
+        "mc_std_NN",
+        "mc_n_NN",
+        "mc_seed_NN",
+        "x",
+        "V",
+    ):
         if key in item:
             result[key] = item[key]
     return result
@@ -216,7 +226,17 @@ def _pack_result(result: Dict[str, Any]) -> Dict[str, Any]:
         "t_grid": _tensor_to_cpu(result["t_grid"]),
         "qhats_pack": _serialize_qhats(result["qhats"]),
     }
-    for key in ("T", "max_impulses", "V0_1", "mc_mean_NN", "mc_std_NN", "x", "V"):
+    for key in (
+        "T",
+        "max_impulses",
+        "V0_1",
+        "mc_mean_NN",
+        "mc_std_NN",
+        "mc_n_NN",
+        "mc_seed_NN",
+        "x",
+        "V",
+    ):
         if key in result:
             packed[key] = _tensor_to_cpu(result[key])
     return packed

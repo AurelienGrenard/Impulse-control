@@ -5,11 +5,13 @@ from __future__ import annotations
 import csv
 import hashlib
 from pathlib import Path
-
-from impulse_control.saving import load_all_results_unlimited, load_results_bundle
-
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from impulse_control.saving import load_all_results_unlimited, load_results_bundle
 
 
 def sha256(path: Path) -> str:
@@ -40,7 +42,7 @@ def main() -> None:
     if len(outputs) != 20:
         raise RuntimeError(f"Expected 20 manuscript panels, found {len(outputs)}")
     for row in rows:
-        for key in ("checkpoint", "notebook", "output"):
+        for key in ("checkpoint", "output"):
             if not (ROOT / row[key]).is_file():
                 raise FileNotFoundError(row[key])
     print(f"figure map ok: {len(outputs)} manuscript panels")

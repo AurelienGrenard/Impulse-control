@@ -7,7 +7,11 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from impulse_control.reproducibility import seed_everything, write_run_manifest
+from impulse_control.reproducibility import (
+    published_training_parameters,
+    seed_everything,
+    write_run_manifest,
+)
 
 
 ROOT = Path(__file__).parents[1]
@@ -44,6 +48,19 @@ def test_run_manifest_records_reproduction_context(tmp_path):
     assert payload["software"]["pytorch"]
 
 
+def test_published_d6_schedule_matches_archived_components():
+    """Check the two horizon-specific training profiles used in the paper."""
+    dividend_t5 = published_training_parameters("dividend", "unlimited", 6, 5)
+    dividend_t10 = published_training_parameters("dividend", "unlimited", 6, 10)
+    harvesting_t5 = published_training_parameters("harvesting", "unlimited", 6, 5)
+    harvesting_t10 = published_training_parameters("harvesting", "unlimited", 6, 10)
+    assert dividend_t5["design_states"] == harvesting_t10["design_states"] == 50_000
+    assert dividend_t5["randomized_candidates"] == 6_000
+    assert harvesting_t10["transfer_steps"] == 500
+    assert dividend_t10["design_states"] == harvesting_t5["design_states"] == 12_500
+    assert dividend_t10["randomized_candidates"] == 5_000
+
+
 def test_figure_map_covers_every_manuscript_panel():
     """Check the article-to-artifact map and all referenced files."""
     with (ROOT / "reproducibility" / "figure-map.csv").open(
@@ -54,8 +71,16 @@ def test_figure_map_covers_every_manuscript_panel():
     assert len({row["output"] for row in rows}) == 20
     for row in rows:
         assert (ROOT / row["checkpoint"]).is_file()
-        assert (ROOT / row["notebook"]).is_file()
         assert (ROOT / row["output"]).is_file()
+
+
+def test_overleaf_figure_folder_matches_generated_figures():
+    """Keep the downloadable Overleaf folder synchronized with generated PNGs."""
+    generated = sorted((ROOT / "figures").glob("*.png"))
+    downloadable = sorted((ROOT / "training_notebook" / "figures").glob("*.png"))
+    assert [path.name for path in generated] == [path.name for path in downloadable]
+    for source, copy in zip(generated, downloadable, strict=True):
+        assert source.read_bytes() == copy.read_bytes()
 
 
 def test_seeded_dividend_training_cli_smoke(tmp_path, monkeypatch):

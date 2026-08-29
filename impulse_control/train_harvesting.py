@@ -8,7 +8,11 @@ from pathlib import Path
 import torch
 
 from .harvesting import *
-from .reproducibility import seed_everything, write_run_manifest
+from .reproducibility import (
+    published_training_parameters,
+    seed_everything,
+    write_run_manifest,
+)
 from .saving import (
     load_all_results_unlimited,
     load_results_bundle,
@@ -358,6 +362,7 @@ def train_limited(
                 "V0_1": V0_1,
                 "mc_mean_NN": mc_mean_NN,
                 "mc_std_NN": mc_std_NN,
+                "mc_n_NN": n_sim_eval,
             }
         )
 
@@ -429,6 +434,21 @@ def train_unlimited(
 
         print(f"\n=== Harvesting ND, training for T = {T_val} (d = {d_state}) ===")
 
+        horizon_N_k = N_k
+        horizon_M_k = M_k
+        horizon_n_global = n_global
+        horizon_transfer_steps = transfer_steps
+        horizon_transfer_lr = None
+        if not smoke_test:
+            published = published_training_parameters(
+                "harvesting", "unlimited", d_state, T_val
+            )
+            horizon_N_k = int(published["design_states"])
+            horizon_M_k = int(published["rollouts_per_state"])
+            horizon_n_global = int(published["randomized_candidates"])
+            horizon_transfer_steps = int(published["transfer_steps"])
+            horizon_transfer_lr = published["transfer_lr"]
+
         # Build experiment configuration
         cfg_T = ExperimentConfig(
             device=device,
@@ -442,12 +462,12 @@ def train_unlimited(
             ),
 
             mc=MCConfig(
-                M_k=M_k,
+                M_k=horizon_M_k,
                 chunk_size_x=8192,
             ),
 
             opt=OptConfig(
-                n_global=n_global,
+                n_global=horizon_n_global,
                 n_global_batch=n_global_batch,
                 min_rel_impulse=min_rel_impulse,
             ),
@@ -458,7 +478,8 @@ def train_unlimited(
                 activation=activation,
                 negative_slope=negative_slope,
                 steps=steps,
-                transfer_steps=transfer_steps,
+                transfer_steps=horizon_transfer_steps,
+                transfer_lr=horizon_transfer_lr,
                 batch_size=batch_size,
             ),
 
@@ -473,7 +494,7 @@ def train_unlimited(
                 x_max=x_max,
                 x_min_plot=0.0,
                 x_max_plot=2.0,
-                N_k=N_k,
+                N_k=horizon_N_k,
             ),
         )
 
@@ -577,6 +598,7 @@ def train_unlimited(
                 "V0_1": V0_1,
                 "mc_mean_NN": mc_mean_NN,
                 "mc_std_NN": mc_std_NN,
+                "mc_n_NN": n_sim_eval,
             }
         )
 

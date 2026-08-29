@@ -5,9 +5,14 @@ from __future__ import annotations
 import argparse
 import gc
 from pathlib import Path
+import sys
 import warnings
 
 import matplotlib.pyplot as plt
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from impulse_control.plotting import (
     plot_limited_paths,
@@ -18,7 +23,6 @@ from impulse_control.plotting import (
 from impulse_control.saving import load_all_results_unlimited, load_results_bundle
 
 
-ROOT = Path(__file__).resolve().parents[1]
 EXPERIMENTS = (
     "dividend_limited_d4",
     "harvesting_limited_d4",

@@ -3,6 +3,8 @@
 Each notebook trains one published checkpoint on `cuda:0`. The notebooks use
 the same public training commands documented in the project README; they only
 add live logs, progress information, resumable output, and SHA-256 reporting.
+Before training, they display the horizon-specific values of $N_k$, $M_k$,
+the randomized-search size, and the transfer-learning schedule.
 
 ## Environment
 
@@ -23,6 +25,9 @@ same `pip` command. Git is not required while a notebook is running.
 Every notebook writes one checkpoint to `retrained_runs/`, with the canonical
 name shown in its title. A JSON run manifest is written beside the checkpoint,
 and the notebook execution log is stored under `retrained_runs/logs/`.
+
+The figures used by the manuscript are copied to `training_notebook/figures/`
+for convenient replacement of the corresponding Overleaf directory.
 
 If execution is interrupted, run the same cell again. Completed maturities or
 impulse budgets stored in the checkpoint are validated and skipped. Do not run

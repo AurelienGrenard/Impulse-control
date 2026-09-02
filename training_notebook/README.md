@@ -1,37 +1,38 @@
 # Training notebooks
 
-Each notebook trains one published checkpoint on `cuda:0`. The notebooks use
-the same public training commands documented in the project README; they only
-add live logs, progress information, resumable output, and SHA-256 reporting.
-Before training, they display the horizon-specific values of $N_k$, $M_k$,
-the randomized-search size, and the transfer-learning schedule.
+This directory contains one notebook for each published checkpoint:
+
+- dividend and harvesting;
+- limited problems in dimensions 1 and 4;
+- unlimited problems in dimensions 1 and 6.
 
 ## Environment
 
-From the repository root, create the reference environment and start Jupyter:
+Create the environment from the repository root and start Jupyter from the
+same checkout:
 
 ```bash
 conda env create -f environment.yml
 conda activate impulse-control-sisc
 python -m pip install --no-deps -e .
-jupyter lab training_notebook/
+jupyter notebook
 ```
 
-An existing compatible environment can instead install the checkout with the
-same `pip` command. Git is not required while a notebook is running.
+Each notebook defaults to `cuda:0`. Change the `DEVICE` cell when another GPU
+must be selected.
 
 ## Outputs
 
-Every notebook writes one checkpoint to `retrained_runs/`, with the canonical
-name shown in its title. A JSON run manifest is written beside the checkpoint,
-and the notebook execution log is stored under `retrained_runs/logs/`.
+Each notebook writes one canonical checkpoint to `retrained_runs/`, streams
+training progress and an ETA, and records logs and SHA-256 manifests. Existing
+completed work is reused.
 
-The figures used by the manuscript are copied to `training_notebook/figures/`
-for convenient replacement of the corresponding Overleaf directory.
+The unlimited `d=6` notebooks reproduce the selected publication bundle:
+each maturity in `T in {5,10,20,40}` is trained independently with its recorded
+seed, saved under `retrained_runs/components/`, and then assembled into the
+canonical `.pt` file. All components use 120,000 rollouts per date, 6,000
+randomized candidates, and LeakyReLU with negative slope 0.01.
 
-If execution is interrupted, run the same cell again. Completed maturities or
-impulse budgets stored in the checkpoint are validated and skipped. Do not run
-two notebooks targeting the same checkpoint simultaneously.
-
-To use a different GPU on a multi-GPU machine, change the `DEVICE` value in the
-configuration cell from `cuda:0` to the required local index.
+The exact source schedule is documented in
+`reproducibility/d6-checkpoint-sources.json`. Temporary training outputs are
+ignored by Git; only the curated checkpoints under `runs/` are published.

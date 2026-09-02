@@ -1,56 +1,34 @@
 # Neural Regression and Randomized Optimization for Impulse Control
 
 This repository contains the code, pretrained checkpoints, and post-processing
-scripts required to reproduce the numerical results in the paper *Neural
-Regression and Randomized Optimization for Impulse Control*.
+scripts required to reproduce the numerical experiments in *Neural Regression
+and Randomized Optimization for Impulse Control*.
 
 Authors: Lokman Abbas Turki, Aurélien Grenard, Idris Kharroubi, Qinghua Li, and
 Antonio Ocello.
 
-The numerical methods are implemented for the dividend problem in Section 6 and
-the harvesting problem in Appendix C. The repository is dedicated to the
-reproducibility material for this paper.
-
 ## Artifact contents
 
 ```text
-impulse_control/
-  common.py              shared optimization and time-grid configuration
-  exact_dividend.py      closed-form dividend benchmark and band policy
-  exact_harvesting.py    closed-form harvesting benchmark and band policy
-  dividend.py            dividend model and numerical algorithms
-  harvesting.py          harvesting model and numerical algorithms
-  saving.py              portable checkpoint serialization
-  plotting.py            grayscale paper figures
-  reproducibility.py     seeds and run manifests
-  train_dividend.py      dividend training command
-  train_harvesting.py    harvesting training command
-training_notebook/       eight independent GPU training notebooks
-runs/                    eight pretrained checkpoints stored with Git LFS
-figures/                 22 generated PNG files, including all paper panels
-reproducibility/         checksums and figure-to-artifact correspondence
-tests/                   checkpoint and plotting smoke tests
-tools/                   figure reproduction and artifact verification commands
-environment.yml          pinned reference software environment
+impulse_control/          models, training algorithms, persistence, and plotting
+training_notebook/       one GPU training notebook per published checkpoint
+runs/                    eight pretrained LeakyReLU checkpoints stored with Git LFS
+figures/                 the 14 PNG panels used in the manuscript
+reproducibility/         checksums, configurations, provenance, and figure map
+tests/                   deterministic, checkpoint, and plotting tests
+tools/                   artifact verification and figure reproduction commands
+environment.yml          pinned reference environment
 ```
 
-The neural networks take the full state in dimension `d` as input. The
-randomized impulse search is also performed in dimension `d`; the implementation
-does not replace a multidimensional problem by a sum of one-dimensional neural
-solutions.
-
-## Training notebooks
-
-The [`training_notebook/`](training_notebook/) directory contains one notebook
-for each published checkpoint. Every notebook defaults to `cuda:0`, streams
-progress and ETA information, and writes resumable results to
-`retrained_runs/`. The device can be changed in one configuration cell when a
-different local GPU is required.
+Every network receives the full state in dimension `d`. The randomized search
+first samples vector-valued impulses in dimension `d`; coordinate masks of the
+best vector candidate are then compared to account for coordinatewise fixed
+costs. The multidimensional problem is never replaced by a sum of trained
+one-dimensional solutions.
 
 ## Obtain the artifact
 
-Git LFS is required because the pretrained checkpoints total approximately
-316 MiB.
+The checkpoints use Git LFS and total approximately 316 MiB.
 
 ```bash
 git lfs install
@@ -60,12 +38,10 @@ git lfs pull
 sha256sum --check reproducibility/checkpoints.sha256
 ```
 
-The SISC supplementary ZIP must contain the materialized `.pt` files rather
-than Git LFS pointer files.
+The supplementary ZIP submitted with the paper must contain materialized
+checkpoint bytes, not Git LFS pointer files.
 
 ## Reference environment
-
-Create the pinned environment and install this package from the checkout:
 
 ```bash
 conda env create -f environment.yml
@@ -73,123 +49,117 @@ conda activate impulse-control-sisc
 python -m pip install --no-deps -e .
 ```
 
-The reference environment uses Python 3.11.9, PyTorch 2.3.1, and CUDA 12.1.
-Loading checkpoints, running tests, and regenerating figures work on CPU.
-Complete training is intended for a CUDA-capable GPU and is substantially more
-expensive. Floating-point roundoff can vary across GPU models and software
-stacks even when the random seed is fixed.
+The pinned environment uses Python 3.11.9, PyTorch 2.3.1, CUDA 12.1,
+NumPy 1.26.4, SciPy 1.13.1, and Matplotlib 3.8.4. Checkpoint loading,
+validation, and figure generation run on CPU. Full training requires a
+CUDA-capable GPU.
 
-## Reproduce every paper figure
-
-First verify the supplied artifact:
+## Reproduce the paper figures
 
 ```bash
 python tools/verify_artifacts.py
-pytest -q
+python -m pytest -q
+MPLBACKEND=Agg CUDA_VISIBLE_DEVICES='' python tools/reproduce_figures.py
 ```
 
-Then regenerate all 22 PNG files from the supplied checkpoints:
+The last command regenerates the 14 manuscript panels from `runs/` without
+retraining. The exact correspondence is recorded in
+[`reproducibility/figure-map.csv`](reproducibility/figure-map.csv).
 
-```bash
-MPLBACKEND=Agg python tools/reproduce_figures.py
-```
+| Figure | Numerical diagnostics |
+|---|---|
+| Fig. 1 | Unlimited dividend and harvesting problems, `d=1` |
+| Fig. 2 | Harvesting finite-budget values and a dividend controlled path |
+| Fig. 3 | Dividend finite-budget paths, `d=4` |
+| Fig. 4 | Unlimited dividend and harvesting problems, `d=6` |
 
-This command overwrites the files in `figures/` without retraining.
+## Published numerical configuration
 
-The complete correspondence between article panels, checkpoints, and PNG
-files is recorded in
-[`reproducibility/figure-map.csv`](reproducibility/figure-map.csv). There are no
-numerical tables in the manuscript.
-
-| Article figure | Experiment | Artifact |
-|---|---|---|
-| Fig. 1 | Dividend, unlimited, `d=1` | `dividend_unlimited_d1` |
-| Fig. 2 | Dividend, limited, `d=1` | `dividend_limited_d1` |
-| Fig. 3 | Dividend, limited paths, `d=4` | `dividend_limited_d4` |
-| Fig. 4 | Dividend, unlimited, `d=6` | `dividend_unlimited_d6` |
-| Fig. 5 | Harvesting, unlimited, `d=1` | `harvesting_unlimited_d1` |
-| Fig. 6 | Harvesting, limited, `d=1` | `harvesting_limited_d1` |
-| Fig. 7 | Harvesting, limited paths, `d=4` | `harvesting_limited_d4` |
-| Fig. 8 | Harvesting, unlimited, `d=6` | `harvesting_unlimited_d6` |
-
-The left panel of Fig. 8 is generated in dimension `d=6`.
-
-## Numerical parameters
-
-All financial and numerical parameters are stored in the training entry points
-and serialized in each checkpoint. The principal settings are:
+The model parameters are:
 
 - dividend: `mu=1`, `sigma=0.5`, `rho=0.05`, `lambda=0.2`, `c=0.5`;
 - harvesting: `mu=0.25`, `sigma=0.25`, `rho=0.05`, `alpha=1`, `x0=1`,
-  `lambda=0.7`, `c=0.7`;
-- network: three hidden layers of width 128 with LeakyReLU activation and
-  negative slope `0.01`;
-- training: 20,000 iterations and batch size 8,192; the base allocation is
-  `(N_k,M_k)=(100000,1)` for `d=1` and `(12500,8)` for `d in {4,6}`;
-- selected `d=6` components use `(N_k,M_k)=(50000,2)`, 500 transfer steps,
-  transfer learning rate `5e-4`, and 6,000 randomized candidates: dividend at
-  `T=5`, and harvesting at `T in {10,25,50,100}`;
-- all other components use 100 transfer steps and 5,000 randomized candidates;
-- intervention grid: `K=T`, with `T=25` for limited experiments and
-  `T in {5, 10, 25, 50, 100}` for unlimited experiments;
-- limited budgets: `n in {1,...,5}` for dividends and `n in {1,...,4}` for
-  harvesting.
+  `lambda=0.7`, `c=0.7`.
 
-The exact horizon-by-horizon schedule is recorded in
-[`reproducibility/training-configurations.json`](reproducibility/training-configurations.json)
-and serialized in every checkpoint.
+All continuation networks have three hidden layers of width 128, LeakyReLU
+activation with negative slope `0.01`, and one scalar output. Initial fits use
+20,000 Adam steps with learning rate `1e-3` and batch size 8,192.
 
-## Retrain the published experiments
+For limited experiments and unlimited `d=1` experiments:
 
-Training commands use seed `1234` by default. The seed, selected device, and
-software versions are written to a JSON manifest beside every new checkpoint.
-Use a new output directory unless replacement of the supplied checkpoints is
-intentional.
+- `(N_k,M_k)=(100000,1)` in `d=1` and `(12500,8)` in `d=4`;
+- 5,000 randomized impulse candidates;
+- 100 transfer steps with learning rate `1e-3`;
+- seed 1234.
+
+For every unlimited `d=6` component:
+
+- `(N_k,M_k)=(15000,8)`, hence 120,000 rollouts per date;
+- 6,000 randomized impulse candidates;
+- 500 transfer steps with learning rate `5e-4`;
+- horizons `T in {5,10,20,40}`.
+
+Unlimited `d=1` uses `T in {5,10,25,50,100}`. Limited experiments use
+`T=25`, budgets `1,...,5` for dividends, and budgets `1,...,4` for
+harvesting. In every experiment, `K=T`, the training Euler step is `1e-2`,
+and the evaluation Euler step is `2e-3`.
+
+The selected `d=6` bundles combine independently trained maturities. Their
+exact seeds, component checksums, and assembly provenance are recorded in
+[`reproducibility/d6-checkpoint-sources.json`](reproducibility/d6-checkpoint-sources.json).
+All other settings are serialized in each checkpoint and summarized in
+[`reproducibility/training-configurations.json`](reproducibility/training-configurations.json).
+
+Policy scores use 500 paths in `d=1` and 1,000 paths in `d=6`. Figure error
+bars are 95% Monte Carlo confidence intervals.
+
+## Retrain the experiments
+
+The eight notebooks under [`training_notebook/`](training_notebook/) each
+produce one canonical `.pt` file in `retrained_runs/`, display progress and an
+ETA, and can resume completed components. The two unlimited `d=6` notebooks
+train the four selected maturity/seed pairs independently and then assemble
+the final checkpoint.
+
+The same entry points can be called directly. For example:
 
 ```bash
-python -m impulse_control.train_dividend --mode unlimited --dimension 1 --seed 1234 --output reproduced_runs/dividend_unlimited_d1.pt
-python -m impulse_control.train_dividend --mode limited   --dimension 1 --seed 1234 --output reproduced_runs/dividend_limited_d1.pt
-python -m impulse_control.train_dividend --mode limited   --dimension 4 --seed 1234 --output reproduced_runs/dividend_limited_d4.pt
-python -m impulse_control.train_dividend --mode unlimited --dimension 6 --seed 1234 --output reproduced_runs/dividend_unlimited_d6.pt
+python -m impulse_control.train_dividend \
+  --mode limited --dimension 1 --seed 1234 \
+  --output reproduced_runs/dividend_limited_d1.pt --progress
 
-python -m impulse_control.train_harvesting --mode unlimited --dimension 1 --seed 1234 --output reproduced_runs/harvesting_unlimited_d1.pt
-python -m impulse_control.train_harvesting --mode limited   --dimension 1 --seed 1234 --output reproduced_runs/harvesting_limited_d1.pt
-python -m impulse_control.train_harvesting --mode limited   --dimension 4 --seed 1234 --output reproduced_runs/harvesting_limited_d4.pt
-python -m impulse_control.train_harvesting --mode unlimited --dimension 6 --seed 1234 --output reproduced_runs/harvesting_unlimited_d6.pt
+python -m impulse_control.train_dividend \
+  --mode unlimited --dimension 6 --horizons 5 --seed 3456 \
+  --output reproduced_runs/components/dividend_d6_seed3456_T005.pt --progress
 ```
 
-Pass `--device cpu` for CPU execution. Pass `--smoke-test` to exercise the same
-pipeline with tiny training and simulation budgets; smoke-test outputs are not
-paper results.
+Omitting `--horizons` uses the published maturity schedule for the requested
+dimension. Pass `--smoke-test --device cpu` to exercise the complete pipeline
+with tiny validation sizes. Smoke-test outputs are not paper results.
 
-Because training is stochastic and GPU arithmetic is platform-dependent,
-retrained networks are expected to reproduce the reported curves and policy
-scores up to Monte Carlo variability and floating-point roundoff, not to have
-byte-identical weights. The supplied checkpoints are the immutable numerical
-artifacts used to draw the committed figures.
+Fixed seeds make the experiment protocol reproducible, but independently
+retrained GPU weights need not be byte-identical across GPU architectures and
+software stacks. The supplied checkpoints are the immutable artifacts used to
+produce the committed figures.
 
 ## Validation and integrity
 
 ```bash
 python -m compileall -q impulse_control tools
 python tools/verify_artifacts.py
-pytest -q
+python -m pytest -q
 ```
 
 `reproducibility/checkpoints.sha256` identifies the exact pretrained files.
-Before submission, a tagged release and a materialized ZIP snapshot should be
-deposited in the SISC Supplementary Materials or an archival repository such as
-Zenodo.
-
-Create the materialized supplementary snapshot with:
+Create a materialized supplementary snapshot with:
 
 ```bash
 python tools/create_sisc_archive.py
 ```
 
-The command rejects unresolved Git LFS pointers and writes an internal checksum
-manifest. Its default output under `dist/` is ignored by Git and is intended for
-direct upload to the journal submission system or Zenodo.
+The command rejects Git LFS pointers and writes an internal SHA-256 manifest.
+The generated ZIP under `dist/` is ignored by Git and is intended for direct
+upload to the journal or an archival repository.
 
 ## Citation
 

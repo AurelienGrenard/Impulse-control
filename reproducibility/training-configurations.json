@@ -1,5 +1,4 @@
 {
-  "seed": 1234,
   "network": {
     "depth": 3,
     "width": 128,
@@ -9,12 +8,13 @@
     "initial_learning_rate": 0.001,
     "batch_size": 8192
   },
-  "base": {
+  "limited_and_d1_unlimited": {
+    "seed": 1234,
     "d1": {
       "design_states": 100000,
       "rollouts_per_state": 1
     },
-    "d4_d6": {
+    "d4": {
       "design_states": 12500,
       "rollouts_per_state": 8
     },
@@ -22,28 +22,39 @@
     "transfer_steps": 100,
     "transfer_learning_rate": 0.001
   },
-  "d6_overrides": {
-    "dividend": {
-      "horizons": [5]
-    },
-    "harvesting": {
-      "horizons": [10, 25, 50, 100]
-    },
-    "design_states": 50000,
-    "rollouts_per_state": 2,
+  "d6_unlimited": {
+    "design_states": 15000,
+    "rollouts_per_state": 8,
+    "rollouts_per_date": 120000,
     "randomized_candidates": 6000,
     "transfer_steps": 500,
-    "transfer_learning_rate": 0.0005
+    "transfer_learning_rate": 0.0005,
+    "seeds": {
+      "dividend": {
+        "T=5": 3456,
+        "T=10": 1234,
+        "T=20": 2345,
+        "T=40": 2345
+      },
+      "harvesting": {
+        "T=5": 1234,
+        "T=10": 3456,
+        "T=20": 2345,
+        "T=40": 2345
+      }
+    }
   },
   "time_grid": {
     "limited_horizon": 25,
-    "unlimited_horizons": [5, 10, 25, 50, 100],
+    "unlimited_d1_horizons": [5, 10, 25, 50, 100],
+    "unlimited_d6_horizons": [5, 10, 20, 40],
     "decision_dates": "K=T",
     "training_euler_step": 0.01,
     "evaluation_euler_step": 0.002
   },
   "policy_evaluation": {
-    "paths": 500,
+    "d1_paths": 500,
+    "d6_paths": 1000,
     "learned_policy_seed": 20260830,
     "band_policy_seed": 1234
   }

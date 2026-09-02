@@ -17,6 +17,8 @@ venv/
 
 # Local manuscript copy
 Article.pdf
+tex/
+legacy/
 
 # Temporary training outputs
 runs/*.tmp

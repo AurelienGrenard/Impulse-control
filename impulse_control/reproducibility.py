@@ -14,6 +14,21 @@ import scipy
 import torch
 
 
+def published_horizons(mode: str, dimension: int) -> tuple[float, ...]:
+    """Return the maturity schedule used by the published checkpoint."""
+    if mode == "limited":
+        return (25.0,)
+    if mode != "unlimited":
+        raise ValueError(f"Unsupported mode: {mode}")
+    return (5.0, 10.0, 20.0, 40.0) if dimension == 6 else (
+        5.0,
+        10.0,
+        25.0,
+        50.0,
+        100.0,
+    )
+
+
 def published_training_parameters(
     application: str,
     mode: str,
@@ -28,14 +43,11 @@ def published_training_parameters(
         "transfer_steps": 100,
         "transfer_lr": None,
     }
-    enhanced_d6 = mode == "unlimited" and dimension == 6 and horizon is not None and (
-        (application == "dividend" and float(horizon) == 5.0)
-        or (application == "harvesting" and float(horizon) in {10.0, 25.0, 50.0, 100.0})
-    )
+    enhanced_d6 = mode == "unlimited" and dimension == 6
     if enhanced_d6:
         parameters.update(
-            design_states=50_000,
-            rollouts_per_state=2,
+            design_states=15_000,
+            rollouts_per_state=8,
             randomized_candidates=6_000,
             transfer_steps=500,
             transfer_lr=5e-4,
@@ -67,6 +79,7 @@ def write_run_manifest(
     activation: str = "leaky_relu",
     negative_slope: float = 0.01,
     randomized_candidates: int = 5_000,
+    horizons: tuple[float, ...] | None = None,
 ) -> Path:
     """Write the seed, command parameters, and software versions beside a checkpoint."""
     target = Path(checkpoint).with_suffix(".json")
@@ -94,11 +107,12 @@ def write_run_manifest(
         },
     }
     if mode == "unlimited":
+        schedule = horizons or published_horizons(mode, dimension)
         payload["horizon_parameters"] = {
             f"T={horizon:g}": published_training_parameters(
                 application, mode, dimension, horizon
             )
-            for horizon in (5.0, 10.0, 25.0, 50.0, 100.0)
+            for horizon in schedule
         }
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

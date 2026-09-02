@@ -24,15 +24,16 @@ from impulse_control.saving import load_all_results_unlimited, load_results_bund
 
 
 EXPERIMENTS = (
-    "dividend_limited_d4",
-    "harvesting_limited_d4",
     "dividend_limited_d1",
+    "dividend_limited_d4",
     "harvesting_limited_d1",
-    "dividend_unlimited_d6",
-    "harvesting_unlimited_d1",
     "dividend_unlimited_d1",
+    "harvesting_unlimited_d1",
+    "dividend_unlimited_d6",
     "harvesting_unlimited_d6",
 )
+LIMITED_VALUE_EXPERIMENTS = {"harvesting_limited_d1"}
+LIMITED_PATH_EXPERIMENTS = {"dividend_limited_d1", "dividend_limited_d4"}
 
 
 def reproduce_one(stem: str, output_dir: Path) -> None:
@@ -48,20 +49,24 @@ def reproduce_one(stem: str, output_dir: Path) -> None:
     checkpoint = ROOT / "runs" / f"{stem}.pt"
     if mode == "limited":
         bundle = load_results_bundle(str(checkpoint), map_location="cpu")
-        plot_limited_summary(
-            bundle,
-            output=str(output_dir / f"{stem}_value_functions.png"),
-            show=False,
-        )
-        plt.close("all")
-        seed = 124 if stem == "dividend_limited_d1" else 123
-        figures = plot_limited_paths(
-            bundle,
-            seed=seed,
-            output_prefix=str(output_dir / stem),
-            show=False,
-        )
-        count = len(figures) + 1
+        count = 0
+        if stem in LIMITED_VALUE_EXPERIMENTS:
+            plot_limited_summary(
+                bundle,
+                output=str(output_dir / f"{stem}_value_functions.png"),
+                show=False,
+            )
+            plt.close("all")
+            count += 1
+        if stem in LIMITED_PATH_EXPERIMENTS:
+            seed = 124 if stem == "dividend_limited_d1" else 123
+            figures = plot_limited_paths(
+                bundle,
+                seed=seed,
+                output_prefix=str(output_dir / stem),
+                show=False,
+            )
+            count += len(figures)
     else:
         results = load_all_results_unlimited(str(checkpoint), map_location="cpu")
         plot_unlimited_summary(

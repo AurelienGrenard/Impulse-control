@@ -18,7 +18,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from impulse_control.reproducibility import published_training_parameters
+from impulse_control.reproducibility import (
+    published_horizons,
+    published_training_parameters,
+)
+from impulse_control.saving import load_all_results_unlimited, save_all_results_unlimited
 
 
 OUTPUT_ROOT = REPOSITORY_ROOT / "retrained_runs"
@@ -26,6 +30,10 @@ DEFAULT_DEVICE = "cuda:0"
 SEED = 1234
 ACTIVATION = "leaky_relu"
 NEGATIVE_SLOPE = 0.01
+PUBLISHED_D6_SEEDS = {
+    "dividend": {5.0: 3456, 10.0: 1234, 20.0: 2345, 40.0: 2345},
+    "harvesting": {5.0: 1234, 10.0: 3456, 20.0: 2345, 40.0: 2345},
+}
 
 
 @dataclass(frozen=True)
@@ -83,9 +91,16 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def _command(task: TrainingTask, device: str) -> list[str]:
+def _command(
+    task: TrainingTask,
+    device: str,
+    *,
+    seed: int = SEED,
+    horizon: float | None = None,
+    output: Path | None = None,
+) -> list[str]:
     """Build the exact reproducible command executed by a notebook."""
-    return [
+    command = [
         sys.executable,
         "-u",
         "-m",
@@ -95,7 +110,7 @@ def _command(task: TrainingTask, device: str) -> list[str]:
         "--dimension",
         str(task.dimension),
         "--seed",
-        str(SEED),
+        str(seed),
         "--activation",
         ACTIVATION,
         "--negative-slope",
@@ -103,9 +118,12 @@ def _command(task: TrainingTask, device: str) -> list[str]:
         "--device",
         device,
         "--output",
-        str(task.output),
+        str(output or task.output),
         "--progress",
     ]
+    if horizon is not None:
+        command.extend(("--horizons", f"{horizon:g}"))
+    return command
 
 
 def preflight(task: TrainingTask, device: str = DEFAULT_DEVICE) -> None:
@@ -132,12 +150,13 @@ def preflight(task: TrainingTask, device: str = DEFAULT_DEVICE) -> None:
     print(f"Network: 3 x 128, {ACTIVATION}, negative slope {NEGATIVE_SLOPE}")
     if task.mode == "unlimited":
         print("Published horizon schedule:")
-        for horizon in (5.0, 10.0, 25.0, 50.0, 100.0):
+        for horizon in published_horizons(task.mode, task.dimension):
             settings = published_training_parameters(
                 task.application, task.mode, task.dimension, horizon
             )
+            seed = PUBLISHED_D6_SEEDS.get(task.application, {}).get(horizon, SEED)
             print(
-                f"  T={horizon:g}: N_k={settings['design_states']}, "
+                f"  T={horizon:g}, seed={seed}: N_k={settings['design_states']}, "
                 f"M_k={settings['rollouts_per_state']}, "
                 f"candidates={settings['randomized_candidates']}, "
                 f"transfer_steps={settings['transfer_steps']}"
@@ -152,10 +171,116 @@ def preflight(task: TrainingTask, device: str = DEFAULT_DEVICE) -> None:
         )
 
 
+def _run_published_d6(task: TrainingTask, device: str) -> Path:
+    """Train the four selected d=6 components and assemble one checkpoint."""
+    schedule = PUBLISHED_D6_SEEDS[task.application]
+    manifest_path = OUTPUT_ROOT / "manifests" / f"{task.stem}.json"
+    if task.output.is_file():
+        existing = load_all_results_unlimited(str(task.output), map_location="cpu")
+        if [float(result["T"]) for result in existing] != list(schedule):
+            raise RuntimeError(
+                f"Existing {task.output} does not use the published d=6 maturities."
+            )
+        if any(result["cfg"].net.activation != ACTIVATION for result in existing):
+            raise RuntimeError(f"Existing {task.output} does not use {ACTIVATION}.")
+        print(f"Published checkpoint already complete: {task.output}")
+        return task.output
+
+    component_root = OUTPUT_ROOT / "components" / task.stem
+    log_root = OUTPUT_ROOT / "logs" / task.stem
+    component_root.mkdir(parents=True, exist_ok=True)
+    log_root.mkdir(parents=True, exist_ok=True)
+    components: list[dict[str, object]] = []
+    started = time.perf_counter()
+
+    for horizon, seed in schedule.items():
+        component = component_root / f"seed{seed}_T{int(horizon):03d}.pt"
+        command = _command(
+            task,
+            device,
+            seed=seed,
+            horizon=horizon,
+            output=component,
+        )
+        log_path = log_root / f"seed{seed}_T{int(horizon):03d}.log"
+        if not component.is_file():
+            environment = os.environ.copy()
+            environment["PYTHONHASHSEED"] = str(seed)
+            environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+            environment["PYTHONIOENCODING"] = "utf-8"
+            environment["PYTHONUTF8"] = "1"
+            environment["MPLCONFIGDIR"] = str(OUTPUT_ROOT / ".matplotlib")
+            Path(environment["MPLCONFIGDIR"]).mkdir(parents=True, exist_ok=True)
+            print(f"\nTraining T={horizon:g}, seed={seed}")
+            print("Command:", " ".join(command), flush=True)
+            with log_path.open("a", encoding="utf-8", buffering=1) as log:
+                process = subprocess.Popen(
+                    command,
+                    cwd=REPOSITORY_ROOT,
+                    env=environment,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    bufsize=1,
+                )
+                assert process.stdout is not None
+                for line in process.stdout:
+                    print(line, end="", flush=True)
+                    log.write(line)
+                return_code = process.wait()
+            if return_code != 0:
+                raise RuntimeError(
+                    f"Training failed for T={horizon:g}; inspect {log_path}."
+                )
+        else:
+            print(f"Reusing component: {component}")
+
+        loaded = load_all_results_unlimited(str(component), map_location="cpu")
+        if len(loaded) != 1 or float(loaded[0]["T"]) != horizon:
+            raise RuntimeError(f"Invalid component checkpoint: {component}")
+        components.append(
+            {
+                "T": horizon,
+                "seed": seed,
+                "path": str(component),
+                "sha256": _sha256(component),
+                "command": command,
+            }
+        )
+
+    results = [
+        load_all_results_unlimited(str(item["path"]), map_location="cpu")[0]
+        for item in components
+    ]
+    save_all_results_unlimited(str(task.output), results)
+    elapsed = time.perf_counter() - started
+    manifest = {
+        "task": task.stem,
+        "status": "complete",
+        "finished_utc": _utc_now(),
+        "elapsed_seconds": elapsed,
+        "output": str(task.output),
+        "checkpoint_bytes": task.output.stat().st_size,
+        "checkpoint_sha256": _sha256(task.output),
+        "activation": ACTIVATION,
+        "negative_slope": NEGATIVE_SLOPE,
+        "device": device,
+        "components": components,
+    }
+    _write_json(manifest_path, manifest)
+    print(f"\nAssembled checkpoint: {task.output}")
+    print(f"SHA-256: {manifest['checkpoint_sha256']}")
+    return task.output
+
+
 def run_training(task: TrainingTask, device: str = DEFAULT_DEVICE) -> Path:
     """Run one training command while streaming output to the notebook and a log."""
     preflight(task, device)
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    if task.mode == "unlimited" and task.dimension == 6:
+        return _run_published_d6(task, device)
     log_path = OUTPUT_ROOT / "logs" / f"{task.stem}.log"
     manifest_path = OUTPUT_ROOT / "manifests" / f"{task.stem}.json"
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -177,7 +302,7 @@ def run_training(task: TrainingTask, device: str = DEFAULT_DEVICE) -> Path:
                 f"T={horizon:g}": published_training_parameters(
                     task.application, task.mode, task.dimension, horizon
                 )
-                for horizon in (5.0, 10.0, 25.0, 50.0, 100.0)
+                for horizon in published_horizons(task.mode, task.dimension)
             }
             if task.mode == "unlimited"
             else published_training_parameters(

@@ -7,6 +7,7 @@ matplotlib.use("Agg")
 
 from impulse_control.plotting import plot_limited_summary, plot_unlimited_summary
 from impulse_control.saving import load_all_results_unlimited, load_results_bundle
+from impulse_control.reproducibility import published_horizons
 
 
 RUNS = Path(__file__).parents[1] / "runs"
@@ -24,6 +25,7 @@ def test_load_limited_checkpoints(application, dimension):
     assert figure.axes
     assert tuple(figure.get_size_inches()) == (8.0, 5.0)
     assert figure.axes[0].get_title() == ""
+    assert all(result["cfg"].net.activation == "leaky_relu" for result in bundle["bounded_results"])
 
 
 @pytest.mark.parametrize("application", ["dividend", "harvesting"])
@@ -34,6 +36,10 @@ def test_load_unlimited_checkpoints(application, dimension):
     results = load_all_results_unlimited(str(path), map_location="cpu")
     assert results
     assert all(result["qhats"] for result in results)
+    assert [result["T"] for result in results] == list(
+        published_horizons("unlimited", dimension)
+    )
+    assert all(result["cfg"].net.activation == "leaky_relu" for result in results)
     figure = plot_unlimited_summary(results, show=False)
     assert figure.axes
     assert tuple(figure.get_size_inches()) == (8.0, 5.0)

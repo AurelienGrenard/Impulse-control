@@ -9,10 +9,23 @@ import torch
 
 from .dividend import *
 from .reproducibility import (
+    published_horizons,
     published_training_parameters,
     seed_everything,
     write_run_manifest,
 )
+
+
+def _parse_horizons(value: str) -> tuple[float, ...]:
+    """Parse a comma-separated list of positive integer maturities."""
+    horizons = tuple(float(item.strip()) for item in value.split(",") if item.strip())
+    if not horizons or any(value <= 0 or not value.is_integer() for value in horizons):
+        raise argparse.ArgumentTypeError("Horizons must be positive integers.")
+    if len(set(horizons)) != len(horizons):
+        raise argparse.ArgumentTypeError("Horizons must be distinct.")
+    return tuple(sorted(horizons))
+
+
 from .saving import (
     load_all_results_unlimited,
     load_results_bundle,
@@ -384,14 +397,15 @@ def train_unlimited(
     activation: str = "leaky_relu",
     negative_slope: float = 0.01,
     progress: bool = False,
+    horizons: tuple[float, ...] | None = None,
 ) -> None:
     # Device, dimension and global parameters
 
     """Train and save the unconstrained experiments for one dimension."""
     device = requested_device   # Computation device
     d_state = dimension                                                 # State dimension
-    T_list = [5.0, 10.0, 25.0, 50.0, 100.0]                     # Tested maturities
-    n_sim_eval = 500                                            # MC paths for policy evaluation
+    T_list = list(horizons or published_horizons("unlimited", d_state))
+    n_sim_eval = 1_000 if d_state == 6 else 500                 # MC paths for policy evaluation
     dt_fine_eval = 2e-3                                         # Fine Euler step for evaluation
     all_results = []                                            # Container for all experiment results
 
@@ -426,6 +440,12 @@ def train_unlimited(
         for result in all_results:
             _validate_resume_result(result, d_state, activation, negative_slope)
     completed_horizons = {float(result["T"]) for result in all_results}
+    unexpected = completed_horizons - set(T_list)
+    if unexpected:
+        raise RuntimeError(
+            "Resume checkpoint contains maturities outside the requested schedule: "
+            f"{sorted(unexpected)}"
+        )
 
 
     for T_val in T_list:
@@ -620,6 +640,11 @@ def main() -> None:
     parser.add_argument("--device", default="cuda:0" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument(
+        "--horizons",
+        type=_parse_horizons,
+        help="Comma-separated unlimited maturities; defaults to the published schedule.",
+    )
+    parser.add_argument(
         "--activation",
         choices=("leaky_relu", "softplus"),
         default="leaky_relu",
@@ -634,9 +659,10 @@ def main() -> None:
     parser.add_argument("--progress", action="store_true", help="Report progress and ETA after every date.")
     parser.add_argument("--smoke-test", action="store_true", help="Run the same pipeline with tiny validation sizes.")
     args = parser.parse_args()
+    if args.mode == "limited" and args.horizons is not None:
+        parser.error("--horizons is available only in unlimited mode.")
     seed_everything(args.seed)
-    trainer = train_limited if args.mode == "limited" else train_unlimited
-    trainer(
+    arguments = (
         args.dimension,
         args.output,
         args.device,
@@ -644,6 +670,20 @@ def main() -> None:
         args.activation,
         args.negative_slope,
         args.progress,
+    )
+    if args.mode == "limited":
+        train_limited(*arguments)
+    else:
+        train_unlimited(*arguments, horizons=args.horizons)
+    schedule = (
+        (1.0,)
+        if args.smoke_test and args.mode == "unlimited"
+        else args.horizons or published_horizons(args.mode, args.dimension)
+    )
+    candidates = 16 if args.smoke_test else int(
+        published_training_parameters(
+            "dividend", args.mode, args.dimension, schedule[0]
+        )["randomized_candidates"]
     )
     write_run_manifest(
         args.output,
@@ -655,7 +695,8 @@ def main() -> None:
         smoke_test=args.smoke_test,
         activation=args.activation,
         negative_slope=args.negative_slope,
-        randomized_candidates=16 if args.smoke_test else 5_000,
+        randomized_candidates=candidates,
+        horizons=schedule if args.mode == "unlimited" else None,
     )
 
 

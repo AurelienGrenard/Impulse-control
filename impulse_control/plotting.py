@@ -241,11 +241,14 @@ def plot_unlimited_policy_consistency(
         raise ValueError("At least one unlimited result is required.")
 
     cfg = ordered[0]["cfg"]
+    evaluation_counts = {int(result.get("mc_n_NN", 500)) for result in ordered}
+    if len(evaluation_counts) != 1:
+        raise ValueError("All maturities must use the same policy-evaluation size.")
+    n_sim_band = evaluation_counts.pop()
     if hasattr(cfg, "dividend"):
         from .exact_dividend import simulate_dividend_policy_nd
 
         params = cfg.dividend
-        n_sim_band = 500
         score_key = "REWARD_total_per_path"
         ylabel = "Reward"
 
@@ -272,7 +275,6 @@ def plot_unlimited_policy_consistency(
         from .exact_harvesting import simulate_band_policy_nd
 
         params = cfg.harvesting
-        n_sim_band = 500
         score_key = "COST_total_per_path"
         ylabel = "Cost"
 

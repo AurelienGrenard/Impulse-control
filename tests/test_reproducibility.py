@@ -8,6 +8,7 @@ import numpy as np
 import torch
 
 from impulse_control.reproducibility import (
+    published_horizons,
     published_training_parameters,
     seed_everything,
     write_run_manifest,
@@ -49,16 +50,19 @@ def test_run_manifest_records_reproduction_context(tmp_path):
 
 
 def test_published_d6_schedule_matches_archived_components():
-    """Check the two horizon-specific training profiles used in the paper."""
+    """Check the common d=6 profile used by every selected maturity."""
     dividend_t5 = published_training_parameters("dividend", "unlimited", 6, 5)
     dividend_t10 = published_training_parameters("dividend", "unlimited", 6, 10)
     harvesting_t5 = published_training_parameters("harvesting", "unlimited", 6, 5)
     harvesting_t10 = published_training_parameters("harvesting", "unlimited", 6, 10)
-    assert dividend_t5["design_states"] == harvesting_t10["design_states"] == 50_000
-    assert dividend_t5["randomized_candidates"] == 6_000
-    assert harvesting_t10["transfer_steps"] == 500
-    assert dividend_t10["design_states"] == harvesting_t5["design_states"] == 12_500
-    assert dividend_t10["randomized_candidates"] == 5_000
+    for profile in (dividend_t5, dividend_t10, harvesting_t5, harvesting_t10):
+        assert profile["design_states"] == 15_000
+        assert profile["rollouts_per_state"] == 8
+        assert profile["randomized_candidates"] == 6_000
+        assert profile["transfer_steps"] == 500
+        assert profile["transfer_lr"] == 5e-4
+    assert published_horizons("unlimited", 6) == (5.0, 10.0, 20.0, 40.0)
+    assert published_horizons("unlimited", 1) == (5.0, 10.0, 25.0, 50.0, 100.0)
 
 
 def test_figure_map_covers_every_manuscript_panel():
@@ -67,20 +71,11 @@ def test_figure_map_covers_every_manuscript_panel():
         newline="", encoding="utf-8"
     ) as stream:
         rows = list(csv.DictReader(stream))
-    assert {int(row["article_figure"]) for row in rows} == set(range(1, 9))
-    assert len({row["output"] for row in rows}) == 20
+    assert {int(row["article_figure"]) for row in rows} == set(range(1, 5))
+    assert len({row["output"] for row in rows}) == 14
     for row in rows:
         assert (ROOT / row["checkpoint"]).is_file()
         assert (ROOT / row["output"]).is_file()
-
-
-def test_overleaf_figure_folder_matches_generated_figures():
-    """Keep the downloadable Overleaf folder synchronized with generated PNGs."""
-    generated = sorted((ROOT / "figures").glob("*.png"))
-    downloadable = sorted((ROOT / "training_notebook" / "figures").glob("*.png"))
-    assert [path.name for path in generated] == [path.name for path in downloadable]
-    for source, copy in zip(generated, downloadable, strict=True):
-        assert source.read_bytes() == copy.read_bytes()
 
 
 def test_seeded_dividend_training_cli_smoke(tmp_path, monkeypatch):

@@ -32,8 +32,12 @@ EXPERIMENTS = (
     "dividend_unlimited_d6",
     "harvesting_unlimited_d6",
 )
-LIMITED_VALUE_EXPERIMENTS = {"harvesting_limited_d1"}
-LIMITED_PATH_EXPERIMENTS = {"dividend_limited_d1", "dividend_limited_d4"}
+LIMITED_VALUE_EXPERIMENTS = {"dividend_limited_d1", "harvesting_limited_d1"}
+LIMITED_PATH_EXPERIMENTS = {
+    "dividend_limited_d1",
+    "dividend_limited_d4",
+    "harvesting_limited_d1",
+}
 
 
 def reproduce_one(stem: str, output_dir: Path) -> None:

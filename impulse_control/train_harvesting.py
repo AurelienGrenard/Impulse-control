@@ -404,7 +404,7 @@ def train_unlimited(
     device = requested_device   # Computation device
     d_state = dimension                                                 # State dimension
     T_list = list(horizons or published_horizons("unlimited", d_state))
-    n_sim_eval = 1_000 if d_state == 6 else 500                 # MC paths for policy evaluation
+    n_sim_eval = 1_000                                          # MC paths for policy evaluation
     dt_fine_eval = 2e-3                                         # Fine Euler step for evaluation
     all_results = []                                            # Container for all experiment results
 

@@ -40,8 +40,8 @@ def main() -> None:
     ) as stream:
         rows = list(csv.DictReader(stream))
     outputs = {row["output"] for row in rows}
-    if len(outputs) != 14:
-        raise RuntimeError(f"Expected 14 manuscript panels, found {len(outputs)}")
+    if len(outputs) != 16:
+        raise RuntimeError(f"Expected 16 manuscript panels, found {len(outputs)}")
     for row in rows:
         for key in ("checkpoint", "output"):
             if not (ROOT / row[key]).is_file():
@@ -52,7 +52,11 @@ def main() -> None:
         for dimension in (1, 4):
             path = ROOT / "runs" / f"{application}_limited_d{dimension}.pt"
             bundle = load_results_bundle(str(path), map_location="cpu")
-            if not bundle["bounded_results"] or bundle["unconstrained"] is None:
+            budgets = [
+                int(result["max_impulses"])
+                for result in bundle["bounded_results"]
+            ]
+            if budgets != [1, 2, 3, 4] or bundle["unconstrained"] is None:
                 raise RuntimeError(f"Incomplete checkpoint: {path.name}")
             configs = [result["cfg"] for result in bundle["bounded_results"]]
             configs.append(bundle["unconstrained"]["config"])
@@ -67,13 +71,12 @@ def main() -> None:
                 raise RuntimeError(f"Unexpected horizons: {path.name}")
             if any(result["cfg"].net.activation != "leaky_relu" for result in results):
                 raise RuntimeError(f"Unexpected activation: {path.name}")
-            if dimension == 6:
-                for result in results:
-                    cfg = result["cfg"]
-                    if int(cfg.design.N_k) * int(cfg.mc.M_k) != 120_000:
-                        raise RuntimeError(f"Unexpected rollout budget: {path.name}")
-                    if int(cfg.opt.n_global) != 6_000:
-                        raise RuntimeError(f"Unexpected candidate count: {path.name}")
+            for result in results:
+                cfg = result["cfg"]
+                if int(cfg.design.N_k) * int(cfg.mc.M_k) != 120_000:
+                    raise RuntimeError(f"Unexpected rollout budget: {path.name}")
+                if int(cfg.opt.n_global) != 6_000:
+                    raise RuntimeError(f"Unexpected candidate count: {path.name}")
             print(f"checkpoint loads: {path.name}")
 
     print(f"artifact ok: 8 checkpoints and {len(outputs)} manuscript panels")

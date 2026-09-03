@@ -65,7 +65,7 @@ def train_limited(
     device = requested_device   # Computation device
     state_dim = dimension                                               # State dimension
     T_fixed = 25.0                                              # Fixed maturity
-    max_imp_list = [1, 2, 3, 4, 5]                              # Tested impulse budgets
+    max_imp_list = [1, 2, 3, 4]                                 # Tested impulse budgets
     n_sim_eval = 25                                             # MC paths for policy evaluation
     dt_fine_eval = 2e-3                                         # Fine Euler step for evaluation
     all_results = []                                            # Container for all experiment results
@@ -405,7 +405,7 @@ def train_unlimited(
     device = requested_device   # Computation device
     d_state = dimension                                                 # State dimension
     T_list = list(horizons or published_horizons("unlimited", d_state))
-    n_sim_eval = 1_000 if d_state == 6 else 500                 # MC paths for policy evaluation
+    n_sim_eval = 1_000                                          # MC paths for policy evaluation
     dt_fine_eval = 2e-3                                         # Fine Euler step for evaluation
     all_results = []                                            # Container for all experiment results
 

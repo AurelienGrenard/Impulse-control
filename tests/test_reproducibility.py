@@ -49,8 +49,8 @@ def test_run_manifest_records_reproduction_context(tmp_path):
     assert payload["software"]["pytorch"]
 
 
-def test_published_d6_schedule_matches_archived_components():
-    """Check the common d=6 profile used by every selected maturity."""
+def test_published_unlimited_schedule_matches_archived_components():
+    """Check the profiles used by the selected unlimited maturities."""
     dividend_t5 = published_training_parameters("dividend", "unlimited", 6, 5)
     dividend_t10 = published_training_parameters("dividend", "unlimited", 6, 10)
     harvesting_t5 = published_training_parameters("harvesting", "unlimited", 6, 5)
@@ -62,7 +62,13 @@ def test_published_d6_schedule_matches_archived_components():
         assert profile["transfer_steps"] == 500
         assert profile["transfer_lr"] == 5e-4
     assert published_horizons("unlimited", 6) == (5.0, 10.0, 20.0, 40.0)
-    assert published_horizons("unlimited", 1) == (5.0, 10.0, 25.0, 50.0, 100.0)
+    assert published_horizons("unlimited", 1) == (5.0, 10.0, 20.0, 40.0)
+    d1 = published_training_parameters("dividend", "unlimited", 1, 40)
+    assert d1["design_states"] == 120_000
+    assert d1["rollouts_per_state"] == 1
+    assert d1["randomized_candidates"] == 6_000
+    assert d1["transfer_steps"] == 500
+    assert d1["transfer_lr"] == 5e-4
 
 
 def test_figure_map_covers_every_manuscript_panel():
@@ -72,7 +78,7 @@ def test_figure_map_covers_every_manuscript_panel():
     ) as stream:
         rows = list(csv.DictReader(stream))
     assert {int(row["article_figure"]) for row in rows} == set(range(1, 5))
-    assert len({row["output"] for row in rows}) == 14
+    assert len({row["output"] for row in rows}) == 16
     for row in rows:
         assert (ROOT / row["checkpoint"]).is_file()
         assert (ROOT / row["output"]).is_file()

@@ -19,7 +19,12 @@ def test_load_limited_checkpoints(application, dimension):
     """Check that every bounded checkpoint loads and renders."""
     path = RUNS / f"{application}_limited_d{dimension}.pt"
     bundle = load_results_bundle(str(path), map_location="cpu")
-    assert bundle["bounded_results"]
+    assert [result["max_impulses"] for result in bundle["bounded_results"]] == [
+        1,
+        2,
+        3,
+        4,
+    ]
     assert bundle["unconstrained"] is not None
     figure = plot_limited_summary(bundle, show=False)
     assert figure.axes
@@ -39,6 +44,7 @@ def test_load_unlimited_checkpoints(application, dimension):
     assert [result["T"] for result in results] == list(
         published_horizons("unlimited", dimension)
     )
+    assert all(result.get("mc_n_NN") == 1_000 for result in results)
     assert all(result["cfg"].net.activation == "leaky_relu" for result in results)
     figure = plot_unlimited_summary(results, show=False)
     assert figure.axes

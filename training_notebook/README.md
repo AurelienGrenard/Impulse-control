@@ -27,12 +27,13 @@ Each notebook writes one canonical checkpoint to `retrained_runs/`, streams
 training progress and an ETA, and records logs and SHA-256 manifests. Existing
 completed work is reused.
 
-The unlimited `d=6` notebooks reproduce the selected publication bundle:
-each maturity in `T in {5,10,20,40}` is trained independently with its recorded
-seed, saved under `retrained_runs/components/`, and then assembled into the
-canonical `.pt` file. All components use 120,000 rollouts per date, 6,000
-randomized candidates, and LeakyReLU with negative slope 0.01.
+The unlimited notebooks use `T in {5,10,20,40}`, 120,000 rollouts per date,
+6,000 randomized candidates, and LeakyReLU with negative slope 0.01. Each
+maturity is trained independently with its recorded seed, saved under
+`retrained_runs/components/`, and then assembled into the canonical `.pt`
+file. Limited notebooks use budgets `1,...,4` for both problems.
 
-The exact source schedule is documented in
+The exact source schedules are documented in
+`reproducibility/d1-checkpoint-sources.json` and
 `reproducibility/d6-checkpoint-sources.json`. Temporary training outputs are
 ignored by Git; only the curated checkpoints under `runs/` are published.

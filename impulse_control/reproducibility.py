@@ -20,13 +20,7 @@ def published_horizons(mode: str, dimension: int) -> tuple[float, ...]:
         return (25.0,)
     if mode != "unlimited":
         raise ValueError(f"Unsupported mode: {mode}")
-    return (5.0, 10.0, 20.0, 40.0) if dimension == 6 else (
-        5.0,
-        10.0,
-        25.0,
-        50.0,
-        100.0,
-    )
+    return (5.0, 10.0, 20.0, 40.0)
 
 
 def published_training_parameters(
@@ -43,11 +37,10 @@ def published_training_parameters(
         "transfer_steps": 100,
         "transfer_lr": None,
     }
-    enhanced_d6 = mode == "unlimited" and dimension == 6
-    if enhanced_d6:
+    if mode == "unlimited":
         parameters.update(
-            design_states=15_000,
-            rollouts_per_state=8,
+            design_states=120_000 if dimension == 1 else 15_000,
+            rollouts_per_state=1 if dimension == 1 else 8,
             randomized_candidates=6_000,
             transfer_steps=500,
             transfer_lr=5e-4,

@@ -36,6 +36,16 @@ PUBLISHED_D6_SEEDS = {
 }
 
 
+def _published_unlimited_seeds(task: "TrainingTask") -> dict[float, int]:
+    """Return the component seed used for each published maturity."""
+    if task.dimension == 1:
+        return {
+            horizon: SEED
+            for horizon in published_horizons(task.mode, task.dimension)
+        }
+    return PUBLISHED_D6_SEEDS[task.application]
+
+
 @dataclass(frozen=True)
 class TrainingTask:
     """Describe one published checkpoint."""
@@ -154,12 +164,12 @@ def preflight(task: TrainingTask, device: str = DEFAULT_DEVICE) -> None:
             settings = published_training_parameters(
                 task.application, task.mode, task.dimension, horizon
             )
-            seed = PUBLISHED_D6_SEEDS.get(task.application, {}).get(horizon, SEED)
+            seed = _published_unlimited_seeds(task)[horizon]
             print(
                 f"  T={horizon:g}, seed={seed}: N_k={settings['design_states']}, "
                 f"M_k={settings['rollouts_per_state']}, "
                 f"candidates={settings['randomized_candidates']}, "
-                f"transfer_steps={settings['transfer_steps']}"
+                f"Adam steps after transfer={settings['transfer_steps']}"
             )
     else:
         settings = published_training_parameters(
@@ -171,9 +181,9 @@ def preflight(task: TrainingTask, device: str = DEFAULT_DEVICE) -> None:
         )
 
 
-def _run_published_d6(task: TrainingTask, device: str) -> Path:
-    """Train the four selected d=6 components and assemble one checkpoint."""
-    schedule = PUBLISHED_D6_SEEDS[task.application]
+def _run_published_unlimited(task: TrainingTask, device: str) -> Path:
+    """Train the selected maturity components and assemble one checkpoint."""
+    schedule = _published_unlimited_seeds(task)
     manifest_path = OUTPUT_ROOT / "manifests" / f"{task.stem}.json"
     if task.output.is_file():
         existing = load_all_results_unlimited(str(task.output), map_location="cpu")
@@ -279,8 +289,8 @@ def run_training(task: TrainingTask, device: str = DEFAULT_DEVICE) -> Path:
     """Run one training command while streaming output to the notebook and a log."""
     preflight(task, device)
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    if task.mode == "unlimited" and task.dimension == 6:
-        return _run_published_d6(task, device)
+    if task.mode == "unlimited":
+        return _run_published_unlimited(task, device)
     log_path = OUTPUT_ROOT / "logs" / f"{task.stem}.log"
     manifest_path = OUTPUT_ROOT / "manifests" / f"{task.stem}.json"
     log_path.parent.mkdir(parents=True, exist_ok=True)

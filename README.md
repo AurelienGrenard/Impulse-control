@@ -13,7 +13,7 @@ Antonio Ocello.
 impulse_control/          models, training algorithms, persistence, and plotting
 training_notebook/       one GPU training notebook per published checkpoint
 runs/                    eight pretrained LeakyReLU checkpoints stored with Git LFS
-figures/                 the 14 PNG panels used in the manuscript
+figures/                 the 16 PNG panels used in the manuscript
 reproducibility/         checksums, configurations, provenance, and figure map
 tests/                   deterministic, checkpoint, and plotting tests
 tools/                   artifact verification and figure reproduction commands
@@ -28,7 +28,7 @@ one-dimensional solutions.
 
 ## Obtain the artifact
 
-The checkpoints use Git LFS and total approximately 316 MiB.
+The checkpoints use Git LFS and total approximately 236 MiB.
 
 ```bash
 git lfs install
@@ -62,14 +62,14 @@ python -m pytest -q
 MPLBACKEND=Agg CUDA_VISIBLE_DEVICES='' python tools/reproduce_figures.py
 ```
 
-The last command regenerates the 14 manuscript panels from `runs/` without
+The last command regenerates the 16 manuscript panels from `runs/` without
 retraining. The exact correspondence is recorded in
 [`reproducibility/figure-map.csv`](reproducibility/figure-map.csv).
 
 | Figure | Numerical diagnostics |
 |---|---|
 | Fig. 1 | Unlimited dividend and harvesting problems, `d=1` |
-| Fig. 2 | Harvesting finite-budget values and a dividend controlled path |
+| Fig. 2 | Finite-budget values and controlled paths for both problems, `d=1` |
 | Fig. 3 | Dividend finite-budget paths, `d=4` |
 | Fig. 4 | Unlimited dividend and harvesting problems, `d=6` |
 
@@ -85,41 +85,43 @@ All continuation networks have three hidden layers of width 128, LeakyReLU
 activation with negative slope `0.01`, and one scalar output. Initial fits use
 20,000 Adam steps with learning rate `1e-3` and batch size 8,192.
 
-For limited experiments and unlimited `d=1` experiments:
+For limited experiments:
 
 - `(N_k,M_k)=(100000,1)` in `d=1` and `(12500,8)` in `d=4`;
 - 5,000 randomized impulse candidates;
-- 100 transfer steps with learning rate `1e-3`;
+- 100 Adam steps per date under transfer learning, with learning rate `1e-3`;
 - seed 1234.
 
-For every unlimited `d=6` component:
+For unlimited experiments in both `d=1` and `d=6`:
 
-- `(N_k,M_k)=(15000,8)`, hence 120,000 rollouts per date;
+- `(N_k,M_k)=(120000,1)` in `d=1` and `(15000,8)` in `d=6`, hence
+  120,000 rollouts per date;
 - 6,000 randomized impulse candidates;
-- 500 transfer steps with learning rate `5e-4`;
+- 500 Adam steps per date under transfer learning, with learning rate `5e-4`;
 - horizons `T in {5,10,20,40}`.
 
-Unlimited `d=1` uses `T in {5,10,25,50,100}`. Limited experiments use
-`T=25`, budgets `1,...,5` for dividends, and budgets `1,...,4` for
-harvesting. In every experiment, `K=T`, the training Euler step is `1e-2`,
-and the evaluation Euler step is `2e-3`.
+Limited experiments use `T=25` and budgets `1,...,4` for both problems. In
+every experiment, `K=T`, the training Euler step is `1e-2`, and the evaluation
+Euler step is `2e-3`.
 
-The selected `d=6` bundles combine independently trained maturities. Their
-exact seeds, component checksums, and assembly provenance are recorded in
+The selected unlimited bundles combine independently trained maturities. Their
+exact seeds and component checksums are recorded in
+[`reproducibility/d1-checkpoint-sources.json`](reproducibility/d1-checkpoint-sources.json)
+and
 [`reproducibility/d6-checkpoint-sources.json`](reproducibility/d6-checkpoint-sources.json).
 All other settings are serialized in each checkpoint and summarized in
 [`reproducibility/training-configurations.json`](reproducibility/training-configurations.json).
 
-Policy scores use 500 paths in `d=1` and 1,000 paths in `d=6`. Figure error
-bars are 95% Monte Carlo confidence intervals.
+Policy scores use 1,000 paths in both dimensions. Figure error bars are 95%
+Monte Carlo confidence intervals.
 
 ## Retrain the experiments
 
 The eight notebooks under [`training_notebook/`](training_notebook/) each
 produce one canonical `.pt` file in `retrained_runs/`, display progress and an
-ETA, and can resume completed components. The two unlimited `d=6` notebooks
-train the four selected maturity/seed pairs independently and then assemble
-the final checkpoint.
+ETA, and can resume completed components. The unlimited notebooks train the
+four selected maturity/seed pairs independently and then assemble the final
+checkpoint.
 
 The same entry points can be called directly. For example:
 

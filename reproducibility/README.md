@@ -5,8 +5,9 @@ PNG file. `checkpoints.sha256` identifies the exact pretrained
 artifacts used for the committed figures.
 
 `training-configurations.json` records the complete published schedules.
-`d6-checkpoint-sources.json` records the seed and SHA-256 digest of every
-independently trained maturity assembled into the two unlimited `d=6` bundles.
+`d1-checkpoint-sources.json` and `d6-checkpoint-sources.json` record the seed
+and SHA-256 digest of every independently trained maturity assembled into the
+unlimited bundles.
 
 The checksums apply to materialized Git LFS files. Run `git lfs pull` before
 checking them. A SISC supplementary archive must likewise include the complete

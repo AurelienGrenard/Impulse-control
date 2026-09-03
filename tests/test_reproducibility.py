@@ -210,3 +210,35 @@ def test_seeded_harvesting_training_cli_smoke(tmp_path, monkeypatch):
     train_harvesting.main()
     assert output.is_file()
     assert json.loads(output.with_suffix(".json").read_text())["seed"] == 1234
+
+
+def test_harvesting_unlimited_smoke_manifest_matches_checkpoint(tmp_path, monkeypatch):
+    """Check that the unlimited smoke manifest records the effective batch size."""
+    from impulse_control import train_harvesting
+    from impulse_control.saving import load_all_results_unlimited
+
+    output = tmp_path / "harvesting_unlimited.pt"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_harvesting",
+            "--mode",
+            "unlimited",
+            "--dimension",
+            "1",
+            "--device",
+            "cpu",
+            "--seed",
+            "1234",
+            "--smoke-test",
+            "--output",
+            str(output),
+        ],
+    )
+    train_harvesting.main()
+
+    result = load_all_results_unlimited(str(output), map_location="cpu")[0]
+    manifest = json.loads(output.with_suffix(".json").read_text())
+    assert result["cfg"].opt.n_global_batch == 8
+    assert manifest["candidate_batch_size"] == result["cfg"].opt.n_global_batch

@@ -423,6 +423,7 @@ def train_unlimited(
     transfer_steps = 100                                        # Transfer learning iterations
     batch_size = 8192                                           # Training batch size
     n_global = 5_000                                            # Random impulse candidates
+    n_global_batch = 512                                        # Candidate batch size
     N_k = 100_000 if d_state == 1 else 12_500                   # Regression states per date
     M_k = 1 if d_state == 1 else 8                              # Rollouts averaged per state
 
@@ -438,10 +439,9 @@ def train_unlimited(
         n_sim_eval = 2
         evaluation_batch_size = 2
         dt_fine_eval = 0.1
-    n_global_batch = 512                                        # Candidate batch size
     min_rel_impulse = 0.4                                       # Sparsification threshold
     x_min = 0.0                                                 # Design domain lower bound
-    x_max = 2.0                                                 # Design domain upper bound                                             # Design domain upper bound
+    x_max = 2.0                                                 # Design domain upper bound
 
     output_path = Path(output)
     if output_path.is_file():

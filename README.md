@@ -33,7 +33,7 @@ The checkpoints use Git LFS and total approximately 236 MiB.
 
 ```bash
 git lfs install
-git clone --branch sisc-article-v1.0.1 --depth 1 \
+git clone --branch sisc-article-v1.0.2 --depth 1 \
   https://github.com/AurelienGrenard/Impulse-control.git
 cd Impulse-control
 git lfs pull

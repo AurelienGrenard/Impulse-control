@@ -1,13 +1,16 @@
 {
-  "source_archive": "unlimited_120k_campaigns.zip",
   "common_configuration": {
     "design_states": 120000,
     "rollouts_per_state": 1,
     "randomized_candidates": 6000,
+    "candidate_batch_size": 512,
+    "min_rel_impulse": 0.4,
     "transfer_steps": 500,
     "transfer_learning_rate": 0.0005,
     "evaluation_paths": 1000,
-    "evaluation_seed": 20260830
+    "evaluation_batch_size": 32,
+    "evaluation_seed": 20260830,
+    "evaluation_standard_deviation_ddof": 1
   },
   "bundles": {
     "dividend_unlimited_d1": {

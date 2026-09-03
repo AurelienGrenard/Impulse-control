@@ -21,10 +21,11 @@ environment.yml          pinned reference environment
 ```
 
 Every network receives the full state in dimension `d`. The randomized search
-first samples vector-valued impulses in dimension `d`; coordinate masks of the
-best vector candidate are then compared to account for coordinatewise fixed
-costs. The multidimensional problem is never replaced by a sum of trained
-one-dimensional solutions.
+samples vector-valued impulses in dimension `d` and retains the best candidate.
+It then zeros coordinates whose relative state displacement is below `0.4` and
+keeps the better of the original and sparsified candidates. The
+multidimensional problem is never replaced by a sum of trained one-dimensional
+solutions.
 
 ## Obtain the artifact
 
@@ -32,7 +33,8 @@ The checkpoints use Git LFS and total approximately 236 MiB.
 
 ```bash
 git lfs install
-git clone https://github.com/AurelienGrenard/Impulse-control.git
+git clone --branch sisc-article-v1.0.1 --depth 1 \
+  https://github.com/AurelienGrenard/Impulse-control.git
 cd Impulse-control
 git lfs pull
 sha256sum --check reproducibility/checkpoints.sha256
@@ -83,7 +85,9 @@ The model parameters are:
 
 All continuation networks have three hidden layers of width 128, LeakyReLU
 activation with negative slope `0.01`, and one scalar output. Initial fits use
-20,000 Adam steps with learning rate `1e-3` and batch size 8,192.
+20,000 Adam steps with learning rate `1e-3` and batch size 8,192. Randomized
+impulse candidates are processed in batches of 512. The relative displacement
+threshold used to construct the single sparsified candidate is `0.4`.
 
 For limited experiments:
 
@@ -112,8 +116,11 @@ and
 All other settings are serialized in each checkpoint and summarized in
 [`reproducibility/training-configurations.json`](reproducibility/training-configurations.json).
 
-Policy scores use 1,000 paths in both dimensions. Figure error bars are 95%
-Monte Carlo confidence intervals.
+Unlimited-policy scores use 1,000 paths in batches of 32, with base seed
+`20260830` incremented once per batch. Their reported standard deviations use
+the sample convention (`ddof=1`). Band-policy benchmarks use seed `1234` and
+the same sample size. Figure error bars are 95% Monte Carlo confidence
+intervals.
 
 ## Retrain the experiments
 

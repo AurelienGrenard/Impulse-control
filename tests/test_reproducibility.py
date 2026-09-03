@@ -8,9 +8,16 @@ import numpy as np
 import torch
 
 from impulse_control.reproducibility import (
+    PUBLISHED_EVALUATION_BATCH_SIZE,
+    PUBLISHED_EVALUATION_PATHS,
+    PUBLISHED_EVALUATION_SEED,
+    PUBLISHED_MIN_REL_IMPULSE,
+    policy_evaluation_batches,
     published_horizons,
     published_training_parameters,
+    sample_mean_std,
     seed_everything,
+    value_diagnostic_seed,
     write_run_manifest,
 )
 
@@ -34,19 +41,58 @@ def test_run_manifest_records_reproduction_context(tmp_path):
     target = write_run_manifest(
         str(tmp_path / "example.pt"),
         application="dividend",
-        mode="limited",
-        dimension=4,
+        mode="unlimited",
+        dimension=6,
         seed=1234,
         device="cpu",
         smoke_test=True,
+        randomized_candidates=16,
+        horizons=(1.0,),
     )
     payload = json.loads(target.read_text(encoding="utf-8"))
     assert payload["seed"] == 1234
-    assert payload["dimension"] == 4
+    assert payload["dimension"] == 6
     assert payload["network"]["activation"] == "leaky_relu"
     assert payload["network"]["negative_slope"] == 0.01
-    assert payload["randomized_candidates"] == 5_000
+    assert payload["randomized_candidates"] == 16
+    assert payload["candidate_batch_size"] == 8
+    assert payload["min_rel_impulse"] == PUBLISHED_MIN_REL_IMPULSE
+    assert payload["policy_evaluation"] == {
+        "paths": 2,
+        "batch_size": 2,
+        "seed": PUBLISHED_EVALUATION_SEED,
+        "standard_deviation_ddof": 1,
+    }
     assert payload["software"]["pytorch"]
+
+
+def test_published_policy_evaluation_protocol():
+    """Check the archived batching, seeds, and sample-standard-deviation rule."""
+    batches = list(policy_evaluation_batches())
+    assert len(batches) == 32
+    assert batches[0] == (PUBLISHED_EVALUATION_BATCH_SIZE, PUBLISHED_EVALUATION_SEED)
+    assert batches[-1] == (8, PUBLISHED_EVALUATION_SEED + 31)
+    assert sum(size for size, _ in batches) == PUBLISHED_EVALUATION_PATHS
+    assert value_diagnostic_seed(40) == PUBLISHED_EVALUATION_SEED + 100_040
+    mean, std = sample_mean_std(np.array([1.0, 2.0, 3.0]))
+    assert mean == 2.0
+    assert np.isclose(std, 1.0)
+
+
+def test_documented_numerical_protocol_matches_public_constants():
+    """Check that the machine-readable configuration matches the implementation."""
+    payload = json.loads(
+        (ROOT / "reproducibility" / "training-configurations.json").read_text()
+    )
+    search = payload["intervention_search"]
+    assert search["candidate_batch_size"] == 512
+    assert search["relative_sparsification_threshold"] == PUBLISHED_MIN_REL_IMPULSE
+    learned = payload["policy_evaluation"]["learned_policy"]
+    assert learned["d1_paths"] == PUBLISHED_EVALUATION_PATHS
+    assert learned["d6_paths"] == PUBLISHED_EVALUATION_PATHS
+    assert learned["batch_size"] == PUBLISHED_EVALUATION_BATCH_SIZE
+    assert learned["base_seed"] == PUBLISHED_EVALUATION_SEED
+    assert learned["standard_deviation_ddof"] == 1
 
 
 def test_published_unlimited_schedule_matches_archived_components():
@@ -59,6 +105,8 @@ def test_published_unlimited_schedule_matches_archived_components():
         assert profile["design_states"] == 15_000
         assert profile["rollouts_per_state"] == 8
         assert profile["randomized_candidates"] == 6_000
+        assert profile["candidate_batch_size"] == 512
+        assert profile["min_rel_impulse"] == PUBLISHED_MIN_REL_IMPULSE
         assert profile["transfer_steps"] == 500
         assert profile["transfer_lr"] == 5e-4
     assert published_horizons("unlimited", 6) == (5.0, 10.0, 20.0, 40.0)

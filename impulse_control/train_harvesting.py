@@ -5,13 +5,20 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from .harvesting import *
 from .reproducibility import (
+    PUBLISHED_EVALUATION_BATCH_SIZE,
+    PUBLISHED_EVALUATION_PATHS,
+    PUBLISHED_EVALUATION_SEED,
+    policy_evaluation_batches,
     published_horizons,
     published_training_parameters,
+    sample_mean_std,
     seed_everything,
+    value_diagnostic_seed,
     write_run_manifest,
 )
 
@@ -404,7 +411,9 @@ def train_unlimited(
     device = requested_device   # Computation device
     d_state = dimension                                                 # State dimension
     T_list = list(horizons or published_horizons("unlimited", d_state))
-    n_sim_eval = 1_000                                          # MC paths for policy evaluation
+    n_sim_eval = PUBLISHED_EVALUATION_PATHS                     # MC paths for policy evaluation
+    evaluation_batch_size = PUBLISHED_EVALUATION_BATCH_SIZE     # Evaluation batch size
+    evaluation_seed = PUBLISHED_EVALUATION_SEED                 # Evaluation base seed
     dt_fine_eval = 2e-3                                         # Fine Euler step for evaluation
     all_results = []                                            # Container for all experiment results
 
@@ -427,6 +436,7 @@ def train_unlimited(
         M_k = 2
         T_list = [1.0]
         n_sim_eval = 2
+        evaluation_batch_size = 2
         dt_fine_eval = 0.1
     n_global_batch = 512                                        # Candidate batch size
     min_rel_impulse = 0.4                                       # Sparsification threshold
@@ -544,6 +554,7 @@ def train_unlimited(
         else:
             x_grid = x_grid_1d.expand(-1, d_state)
 
+        seed_everything(value_diagnostic_seed(T_val))
         with torch.no_grad():
 
             V_vals = vhat_unconstrained(
@@ -574,30 +585,34 @@ def train_unlimited(
         x_np = x_grid_1d.view(-1).cpu().numpy()
         V_np = V_vals.cpu().numpy()
 
-        # Monte Carlo evaluation of learned NN policy
-        x0_paths = torch.full(
-            (n_sim_eval, d_state),
-            1.0,
-            device=cfg_T.device,
-            dtype=cfg_T.dtype,
-        )
+        # Reproduce the archived batched policy evaluation.
+        cost_batches = []
+        for batch_n, batch_seed in policy_evaluation_batches(
+            n_sim_eval, evaluation_batch_size, evaluation_seed
+        ):
+            seed_everything(batch_seed)
+            x0_paths = torch.full(
+                (batch_n, d_state),
+                1.0,
+                device=cfg_T.device,
+                dtype=cfg_T.dtype,
+            )
+            sim_NN = simulate_controlled_paths(
+                problem=problem_T,
+                stepper=EulerStepper(),
+                policy=qhats_T,
+                t_grid=t_grid_T,
+                x0=x0_paths,
+                opt_cfg=cfg_T.opt,
+                n_sim=batch_n,
+                n_display=0,
+                dt_fine=dt_fine_eval,
+                seed=batch_seed,
+            )
+            cost_batches.append(sim_NN["costs"].detach().cpu().numpy())
 
-        sim_NN = simulate_controlled_paths(
-            problem=problem_T,
-            stepper=EulerStepper(),
-            policy=qhats_T,
-            t_grid=t_grid_T,
-            x0=x0_paths,
-            opt_cfg=cfg_T.opt,
-            n_sim=n_sim_eval,
-            n_display=3,
-            dt_fine=dt_fine_eval,
-        )
-
-        costs_NN = sim_NN["costs"].detach().cpu().numpy()
-
-        mc_mean_NN = float(costs_NN.mean())
-        mc_std_NN  = float(costs_NN.std())
+        costs_NN = np.concatenate(cost_batches)
+        mc_mean_NN, mc_std_NN = sample_mean_std(costs_NN)
 
         print(
             f"T = {T_val:6.1f} | "
@@ -619,6 +634,8 @@ def train_unlimited(
                 "mc_mean_NN": mc_mean_NN,
                 "mc_std_NN": mc_std_NN,
                 "mc_n_NN": n_sim_eval,
+                "mc_seed_NN": evaluation_seed,
+                "mc_batch_size_NN": evaluation_batch_size,
             }
         )
 

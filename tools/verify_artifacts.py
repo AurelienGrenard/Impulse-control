@@ -12,7 +12,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from impulse_control.saving import load_all_results_unlimited, load_results_bundle
-from impulse_control.reproducibility import published_horizons
+from impulse_control.reproducibility import (
+    PUBLISHED_EVALUATION_PATHS,
+    PUBLISHED_EVALUATION_SEED,
+    PUBLISHED_MIN_REL_IMPULSE,
+    published_horizons,
+)
 
 
 def sha256(path: Path) -> str:
@@ -62,6 +67,8 @@ def main() -> None:
             configs.append(bundle["unconstrained"]["config"])
             if any(cfg.net.activation != "leaky_relu" for cfg in configs):
                 raise RuntimeError(f"Unexpected activation: {path.name}")
+            if any(float(cfg.opt.min_rel_impulse) != PUBLISHED_MIN_REL_IMPULSE for cfg in configs):
+                raise RuntimeError(f"Unexpected sparsification threshold: {path.name}")
             print(f"checkpoint loads: {path.name}")
         for dimension in (1, 6):
             path = ROOT / "runs" / f"{application}_unlimited_d{dimension}.pt"
@@ -77,6 +84,14 @@ def main() -> None:
                     raise RuntimeError(f"Unexpected rollout budget: {path.name}")
                 if int(cfg.opt.n_global) != 6_000:
                     raise RuntimeError(f"Unexpected candidate count: {path.name}")
+                if int(cfg.opt.n_global_batch) != 512:
+                    raise RuntimeError(f"Unexpected candidate batch size: {path.name}")
+                if float(cfg.opt.min_rel_impulse) != PUBLISHED_MIN_REL_IMPULSE:
+                    raise RuntimeError(f"Unexpected sparsification threshold: {path.name}")
+                if result.get("mc_n_NN") != PUBLISHED_EVALUATION_PATHS:
+                    raise RuntimeError(f"Unexpected evaluation path count: {path.name}")
+                if result.get("mc_seed_NN") != PUBLISHED_EVALUATION_SEED:
+                    raise RuntimeError(f"Unexpected evaluation seed: {path.name}")
             print(f"checkpoint loads: {path.name}")
 
     print(f"artifact ok: 8 checkpoints and {len(outputs)} manuscript panels")

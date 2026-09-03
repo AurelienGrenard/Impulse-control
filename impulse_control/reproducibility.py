@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 import json
 import platform
 import random
@@ -12,6 +13,12 @@ import matplotlib
 import numpy as np
 import scipy
 import torch
+
+
+PUBLISHED_MIN_REL_IMPULSE = 0.4
+PUBLISHED_EVALUATION_PATHS = 1_000
+PUBLISHED_EVALUATION_BATCH_SIZE = 32
+PUBLISHED_EVALUATION_SEED = 20_260_830
 
 
 def published_horizons(mode: str, dimension: int) -> tuple[float, ...]:
@@ -34,6 +41,8 @@ def published_training_parameters(
         "design_states": 100_000 if dimension == 1 else 12_500,
         "rollouts_per_state": 1 if dimension == 1 else 8,
         "randomized_candidates": 5_000,
+        "candidate_batch_size": 512,
+        "min_rel_impulse": PUBLISHED_MIN_REL_IMPULSE,
         "transfer_steps": 100,
         "transfer_lr": None,
     }
@@ -46,6 +55,33 @@ def published_training_parameters(
             transfer_lr=5e-4,
         )
     return parameters
+
+
+def value_diagnostic_seed(horizon: float) -> int:
+    """Return the archived seed used to evaluate a value function."""
+    return PUBLISHED_EVALUATION_SEED + 100_000 + int(horizon)
+
+
+def policy_evaluation_batches(
+    n_paths: int = PUBLISHED_EVALUATION_PATHS,
+    batch_size: int = PUBLISHED_EVALUATION_BATCH_SIZE,
+    base_seed: int = PUBLISHED_EVALUATION_SEED,
+) -> Iterator[tuple[int, int]]:
+    """Yield the batch size and seed used by each policy-evaluation batch."""
+    if n_paths <= 0 or batch_size <= 0:
+        raise ValueError("Policy-evaluation path and batch counts must be positive.")
+    for start in range(0, n_paths, batch_size):
+        yield min(batch_size, n_paths - start), base_seed + start // batch_size
+
+
+def sample_mean_std(values: np.ndarray) -> tuple[float, float]:
+    """Return the mean and sample standard deviation used in the figures."""
+    array = np.asarray(values).reshape(-1)
+    if array.size == 0:
+        raise ValueError("At least one policy score is required.")
+    mean = float(array.mean())
+    std = float(array.std(ddof=1)) if array.size > 1 else 0.0
+    return mean, std
 
 
 def seed_everything(seed: int) -> None:
@@ -90,6 +126,8 @@ def write_run_manifest(
             "negative_slope": negative_slope,
         },
         "randomized_candidates": randomized_candidates,
+        "candidate_batch_size": 8 if smoke_test else 512,
+        "min_rel_impulse": PUBLISHED_MIN_REL_IMPULSE,
         "software": {
             "python": platform.python_version(),
             "pytorch": torch.__version__,
@@ -101,6 +139,12 @@ def write_run_manifest(
     }
     if mode == "unlimited":
         schedule = horizons or published_horizons(mode, dimension)
+        payload["policy_evaluation"] = {
+            "paths": 2 if smoke_test else PUBLISHED_EVALUATION_PATHS,
+            "batch_size": 2 if smoke_test else PUBLISHED_EVALUATION_BATCH_SIZE,
+            "seed": PUBLISHED_EVALUATION_SEED,
+            "standard_deviation_ddof": 1,
+        }
         payload["horizon_parameters"] = {
             f"T={horizon:g}": published_training_parameters(
                 application, mode, dimension, horizon

@@ -8,6 +8,11 @@
     "initial_learning_rate": 0.001,
     "batch_size": 8192
   },
+  "intervention_search": {
+    "candidate_batch_size": 512,
+    "relative_sparsification_threshold": 0.4,
+    "postprocessing": "compare the best vector candidate with one thresholded candidate"
+  },
   "limited": {
     "seed": 1234,
     "d1": {
@@ -61,9 +66,19 @@
     "evaluation_euler_step": 0.002
   },
   "policy_evaluation": {
-    "d1_paths": 1000,
-    "d6_paths": 1000,
-    "learned_policy_seed": 20260830,
-    "band_policy_seed": 1234
+    "learned_policy": {
+      "d1_paths": 1000,
+      "d6_paths": 1000,
+      "batch_size": 32,
+      "base_seed": 20260830,
+      "seed_rule": "base seed plus zero-based batch index",
+      "standard_deviation_ddof": 1
+    },
+    "band_policy_benchmark": {
+      "d1_paths": 1000,
+      "d6_paths": 1000,
+      "seed": 1234,
+      "standard_deviation_ddof": 0
+    }
   }
 }

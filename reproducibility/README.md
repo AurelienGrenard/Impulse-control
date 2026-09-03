@@ -7,7 +7,8 @@ artifacts used for the committed figures.
 `training-configurations.json` records the complete published schedules.
 `d1-checkpoint-sources.json` and `d6-checkpoint-sources.json` record the seed
 and SHA-256 digest of every independently trained maturity assembled into the
-unlimited bundles.
+unlimited bundles. They also record the batched, seeded policy-evaluation
+protocol used to compute the statistics stored in those bundles.
 
 The checksums apply to materialized Git LFS files. Run `git lfs pull` before
 checking them. A SISC supplementary archive must likewise include the complete

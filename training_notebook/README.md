@@ -31,7 +31,8 @@ The unlimited notebooks use `T in {5,10,20,40}`, 120,000 rollouts per date,
 6,000 randomized candidates, and LeakyReLU with negative slope 0.01. Each
 maturity is trained independently with its recorded seed, saved under
 `retrained_runs/components/`, and then assembled into the canonical `.pt`
-file. Limited notebooks use budgets `1,...,4` for both problems.
+file. Its learned policy is evaluated on 1,000 paths in seeded batches of 32.
+Limited notebooks use budgets `1,...,4` for both problems.
 
 The exact source schedules are documented in
 `reproducibility/d1-checkpoint-sources.json` and

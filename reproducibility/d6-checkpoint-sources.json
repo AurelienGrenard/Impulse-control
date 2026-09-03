@@ -1,5 +1,15 @@
 {
-  "source_archive": "unlimited_120k_campaigns.zip",
+  "common_learned_policy_evaluation": {
+    "paths": 1000,
+    "batch_size": 32,
+    "base_seed": 20260830,
+    "seed_rule": "base seed plus zero-based batch index",
+    "standard_deviation_ddof": 1
+  },
+  "common_intervention_search": {
+    "candidate_batch_size": 512,
+    "min_rel_impulse": 0.4
+  },
   "bundles": {
     "dividend_unlimited_d6": {
       "output_sha256": "556a63eb696f663ba9698a237efea2d7b334fa3a12f3c5310721a2ef848b9864",

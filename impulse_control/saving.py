@@ -173,6 +173,7 @@ def _rebuild_result(item: Dict[str, Any], application: str, map_location: str) -
         "mc_std_NN",
         "mc_n_NN",
         "mc_seed_NN",
+        "mc_batch_size_NN",
         "x",
         "V",
     ):
@@ -234,6 +235,7 @@ def _pack_result(result: Dict[str, Any]) -> Dict[str, Any]:
         "mc_std_NN",
         "mc_n_NN",
         "mc_seed_NN",
+        "mc_batch_size_NN",
         "x",
         "V",
     ):

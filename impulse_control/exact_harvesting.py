@@ -46,7 +46,7 @@ def _solve_d_given_xhat(x_hat: float, A: float, B: float, r1: float, lam: float,
     while T(dR) < 0.0:
         dR *= 2.0
         if dR > 1e12:
-            raise RuntimeError("Failed to bracket d. Check parameters (A,B,r1,c,λ) or try different seeds.")
+            raise RuntimeError("Failed to bracket d. Check parameters (A, B, r1, c, lambda).")
 
     # Bisection
     for _ in range(itmax):

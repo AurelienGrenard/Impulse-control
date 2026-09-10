@@ -47,7 +47,7 @@ def _application(path: str | os.PathLike[str], payload: Dict[str, Any]) -> str:
         return "dividend"
     if cfg and "harvesting" in cfg:
         return "harvesting"
-    raise ValueError("Application impossible à déduire du checkpoint.")
+    raise ValueError("Cannot infer the application from the checkpoint.")
 
 
 def _api(application: str):

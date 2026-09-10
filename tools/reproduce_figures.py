@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import gc
 from pathlib import Path
 import sys
@@ -38,6 +39,18 @@ LIMITED_PATH_EXPERIMENTS = {
     "dividend_limited_d4",
     "harvesting_limited_d1",
 }
+
+
+def policy_comparison_rows(application: str, dimension: int):
+    """Load the common-path annual-grid policy evaluation used in the paper."""
+    path = ROOT / "reproducibility" / "policy-evaluation.csv"
+    with path.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    return [
+        row
+        for row in rows
+        if row["problem"] == application and int(row["d"]) == dimension
+    ]
 
 
 def reproduce_one(stem: str, output_dir: Path) -> None:
@@ -81,6 +94,7 @@ def reproduce_one(stem: str, output_dir: Path) -> None:
         plt.close("all")
         plot_unlimited_policy_consistency(
             results,
+            comparison_rows=policy_comparison_rows(application, dimension),
             output=str(output_dir / f"{stem}_policy_consistency.png"),
             show=False,
         )

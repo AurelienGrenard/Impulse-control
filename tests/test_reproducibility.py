@@ -130,6 +130,26 @@ def test_figure_map_covers_every_manuscript_panel():
     for row in rows:
         assert (ROOT / row["checkpoint"]).is_file()
         assert (ROOT / row["output"]).is_file()
+        if row.get("statistics"):
+            assert (ROOT / row["statistics"]).is_file()
+
+
+def test_policy_evaluation_table_covers_every_unlimited_comparison():
+    """Check the common-path statistics used by the four policy panels."""
+    with (ROOT / "reproducibility" / "policy-evaluation.csv").open(
+        newline="", encoding="utf-8"
+    ) as stream:
+        rows = list(csv.DictReader(stream))
+    expected = {
+        (application, dimension, horizon)
+        for application in ("dividend", "harvesting")
+        for dimension in (1, 6)
+        for horizon in (5, 10, 20, 40)
+    }
+    assert {
+        (row["problem"], int(row["d"]), int(row["T"])) for row in rows
+    } == expected
+    assert all(int(row["n_paths"]) == PUBLISHED_EVALUATION_PATHS for row in rows)
 
 
 def test_seeded_dividend_training_cli_smoke(tmp_path, monkeypatch):

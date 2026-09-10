@@ -77,8 +77,13 @@
     "band_policy_benchmark": {
       "d1_paths": 1000,
       "d6_paths": 1000,
-      "seed": 1234,
-      "standard_deviation_ddof": 0
+      "common_paths_with_learned_policy": true,
+      "base_seed": 20260830,
+      "seed_rule": "base seed plus zero-based batch index",
+      "decision_grid": "annual dates t_k=k",
+      "horizon_treatment": "stationary band rule truncated at T",
+      "standard_deviation_ddof": 1,
+      "archived_statistics": "reproducibility/policy-evaluation.csv"
     }
   }
 }

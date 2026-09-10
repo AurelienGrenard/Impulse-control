@@ -231,10 +231,11 @@ def plot_unlimited_summary(
 def plot_unlimited_policy_consistency(
     results: Iterable[Dict[str, Any]],
     *,
+    comparison_rows: Optional[Iterable[Dict[str, Any]]] = None,
     output: Optional[str] = None,
     show: bool = True,
 ):
-    """Compare learned-policy and exact band-policy Monte Carlo scores."""
+    """Compare learned-policy and band-policy Monte Carlo scores."""
     use_white_style()
     ordered = sorted(results, key=lambda item: item["T"])
     if not ordered:
@@ -298,27 +299,41 @@ def plot_unlimited_policy_consistency(
                 device=cfg.device,
             )
 
-    band_means = []
-    band_stds = []
-    for result in ordered:
-        scores = simulate_band(float(result["T"]))[score_key].detach().cpu().numpy()
-        band_means.append(float(scores.mean()))
-        band_stds.append(float(scores.std()))
-
     horizons = np.asarray([result["T"] for result in ordered], dtype=float)
-    learned_means = np.asarray([result["mc_mean_NN"] for result in ordered], dtype=float)
-    learned_counts = np.asarray(
-        [result.get("mc_n_NN", 500) for result in ordered], dtype=float
-    )
-    learned_stds = np.asarray([result["mc_std_NN"] for result in ordered], dtype=float)
-    band_means_np = np.asarray(band_means)
-    band_stds_np = np.asarray(band_stds)
+    if comparison_rows is None:
+        band_means = []
+        band_stds = []
+        for result in ordered:
+            scores = simulate_band(float(result["T"]))[score_key].detach().cpu().numpy()
+            band_means.append(float(scores.mean()))
+            band_stds.append(float(scores.std()))
+        learned_means = np.asarray(
+            [result["mc_mean_NN"] for result in ordered], dtype=float
+        )
+        learned_counts = np.asarray(
+            [result.get("mc_n_NN", 500) for result in ordered], dtype=float
+        )
+        learned_stds = np.asarray(
+            [result["mc_std_NN"] for result in ordered], dtype=float
+        )
+        learned_errors = 1.96 * learned_stds / np.sqrt(learned_counts)
+        band_means_np = np.asarray(band_means)
+        band_errors = 1.96 * np.asarray(band_stds) / np.sqrt(n_sim_band)
+    else:
+        rows = sorted(comparison_rows, key=lambda item: float(item["T"]))
+        row_horizons = np.asarray([float(row["T"]) for row in rows])
+        if len(rows) != len(ordered) or not np.array_equal(row_horizons, horizons):
+            raise ValueError("Comparison rows must match the checkpoint horizons.")
+        learned_means = np.asarray([float(row["learned"]) for row in rows])
+        learned_errors = np.asarray([float(row["learned_ci95"]) for row in rows])
+        band_means_np = np.asarray([float(row["annual_band"]) for row in rows])
+        band_errors = np.asarray([float(row["annual_band_ci95"]) for row in rows])
 
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
     ax.errorbar(
         horizons,
         learned_means,
-        yerr=1.96 * learned_stds / np.sqrt(learned_counts),
+        yerr=learned_errors,
         fmt="x-",
         markersize=8.0,
         markeredgewidth=1.8,
@@ -332,7 +347,7 @@ def plot_unlimited_policy_consistency(
     ax.errorbar(
         horizons,
         band_means_np,
-        yerr=1.96 * band_stds_np / np.sqrt(n_sim_band),
+        yerr=band_errors,
         fmt="o--",
         markersize=9.0,
         markerfacecolor="white",

@@ -64,9 +64,17 @@ python -m pytest -q
 MPLBACKEND=Agg CUDA_VISIBLE_DEVICES='' python tools/reproduce_figures.py
 ```
 
-The last command regenerates the 16 manuscript panels from `runs/` without
-retraining. The exact correspondence is recorded in
+The last command regenerates the 16 manuscript panels from the supplied
+checkpoints and archived policy-evaluation statistics, without retraining. The
+exact correspondence is recorded in
 [`reproducibility/figure-map.csv`](reproducibility/figure-map.csv).
+
+To recompute the common-path policy statistics before regenerating the figures,
+run on a CUDA-capable machine:
+
+```bash
+python tools/evaluate_policy_comparison.py --device cuda
+```
 
 | Figure | Numerical diagnostics |
 |---|---|
@@ -116,11 +124,12 @@ and
 All other settings are serialized in each checkpoint and summarized in
 [`reproducibility/training-configurations.json`](reproducibility/training-configurations.json).
 
-Unlimited-policy scores use 1,000 paths in batches of 32, with base seed
-`20260830` incremented once per batch. Their reported standard deviations use
-the sample convention (`ddof=1`). Band-policy benchmarks use seed `1234` and
-the same sample size. Figure error bars are 95% Monte Carlo confidence
-intervals.
+Unlimited-policy comparisons use 1,000 common Brownian paths in batches of 32,
+with base seed `20260830` incremented once per batch. The stationary
+infinite-horizon band rule is truncated at the reported maturity and applied
+only at the same annual decision dates as the learned policy. The resulting
+statistics are archived in `reproducibility/policy-evaluation.csv`. Figure
+error bars are marginal 95% Monte Carlo confidence intervals.
 
 ## Retrain the experiments
 

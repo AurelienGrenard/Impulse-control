@@ -51,7 +51,28 @@ def main() -> None:
         for key in ("checkpoint", "output"):
             if not (ROOT / row[key]).is_file():
                 raise FileNotFoundError(row[key])
+        if row.get("statistics") and not (ROOT / row["statistics"]).is_file():
+            raise FileNotFoundError(row["statistics"])
     print(f"figure map ok: {len(outputs)} manuscript panels")
+
+    with (ROOT / "reproducibility" / "policy-evaluation.csv").open(
+        newline="", encoding="utf-8"
+    ) as stream:
+        policy_rows = list(csv.DictReader(stream))
+    expected_policy_rows = {
+        (application, dimension, horizon)
+        for application in ("dividend", "harvesting")
+        for dimension in (1, 6)
+        for horizon in (5, 10, 20, 40)
+    }
+    actual_policy_rows = {
+        (row["problem"], int(row["d"]), int(row["T"])) for row in policy_rows
+    }
+    if actual_policy_rows != expected_policy_rows:
+        raise RuntimeError("Incomplete policy-evaluation table")
+    if any(int(row["n_paths"]) != PUBLISHED_EVALUATION_PATHS for row in policy_rows):
+        raise RuntimeError("Unexpected policy-evaluation path count")
+    print(f"policy evaluation ok: {len(policy_rows)} common-path comparisons")
 
     for application in ("dividend", "harvesting"):
         for dimension in (1, 4):

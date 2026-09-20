@@ -69,11 +69,11 @@ class HarvestingParams:
     """Store one-dimensional harvesting parameters."""
     mu: float = 0.25       # Drift coefficient
     sigma: float = 0.25   # Volatility
-    rho: float = 0.05     # Discount rate
+    rho: float = 0.20     # Discount rate
     alpha: float = 1.0    # Running cost weight
     x0: float = 1.0       # Target state for (X - x0)^2
     lam: float = 0.7     # Proportional impulse cost
-    c: float = 0.7       # Fixed impulse cost
+    c: float = 0.05      # Fixed impulse cost
 
 # Fully ND harvesting parameters
 
@@ -676,29 +676,35 @@ def argmin_intervention_value(
 
         start += this_batch
 
-    # x_post_best: state after applying xi_best
-    x_post_best = problem.apply_impulse(x_pos, xi_best)   # [B_pos, d]
-
-    # Relative move per coordinate: |x_post - x| / |x|
-    # Use the current state magnitude as the relative scale.
-    x_abs = x_pos.abs().clamp_min(1e-6)                   # [B_pos, d]
-    delta = (x_post_best - x_pos).abs()                   # [B_pos, d]
-    rel_move = delta / x_abs                              # [B_pos, d]
-
-    # Keep only coordinates where the relative move is large enough
     thresh = opt_cfg.min_rel_impulse
-    mask_keep = (rel_move >= thresh)                      # [B_pos, d] in {0,1}
-
-    xi_sparse = xi_best * mask_keep.to(xi_best.dtype)     # [B_pos, d]
-
-    # Evaluate objective with sparsified xi
-    x_post_sparse = problem.apply_impulse(x_pos, xi_sparse)  # [B_pos, d]
-    val_sparse = qhat(x_post_sparse) + problem.impulse_cost(t, xi_sparse)  # [B_pos]
-
-    # Keep the better between dense xi_best and sparse xi_sparse
-    better_sparse = val_sparse < v_best
-    v_best = torch.where(better_sparse, val_sparse, v_best)
-    xi_best = torch.where(better_sparse[:, None], xi_sparse, xi_best)
+    if thresh is not None:
+        raise ValueError("The published intervention search requires all coordinate masks.")
+    # Freeze every possible subset of coordinates after the vector search.
+    # This preserves the d-dimensional randomized search while accounting
+    # for the fixed cost paid on each active coordinate.
+    codes = torch.arange(1, 1 << d, device=x.device, dtype=torch.long)
+    bits = torch.arange(d, device=x.device, dtype=torch.long)
+    masks = ((codes[:, None] >> bits[None, :]) & 1).to(x.dtype)
+    masked_best = torch.full_like(v_best, float("inf"))
+    masked_xi = torch.zeros_like(xi_best)
+    rows = torch.arange(Bp, device=x.device)
+    for start in range(0, masks.shape[0], 16):
+        local_masks = masks[start : start + 16]
+        count = local_masks.shape[0]
+        candidates = xi_best[:, None, :] * local_masks[None, :, :]
+        x_rep = x_pos[:, None, :].expand(Bp, count, d).reshape(-1, d)
+        xi_rep = candidates.reshape(-1, d)
+        values = (
+            qhat(problem.apply_impulse(x_rep, xi_rep)).view(Bp, count)
+            + problem.impulse_cost(t, xi_rep).view(Bp, count)
+        )
+        local = values.argmin(dim=1)
+        local_values = values[rows, local]
+        local_xi = candidates[rows, local]
+        better = local_values < masked_best
+        masked_best = torch.where(better, local_values, masked_best)
+        masked_xi = torch.where(better[:, None], local_xi, masked_xi)
+    v_best, xi_best = masked_best, masked_xi
 
     # Scatter back into full tensors
     m_val[idx] = v_best

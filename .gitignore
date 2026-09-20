@@ -24,3 +24,6 @@ legacy/
 runs/*.tmp
 runs/*.part
 retrained_runs/
+
+# Local exploratory campaigns; publication notebooks live at directory root.
+training_notebook/*/

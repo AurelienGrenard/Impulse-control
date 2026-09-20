@@ -8,13 +8,18 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from . import dividend as dividend_module
 from .dividend import *
+from .reporting import build_reported_results
 from .reproducibility import (
     PUBLISHED_EVALUATION_BATCH_SIZE,
     PUBLISHED_EVALUATION_PATHS,
     PUBLISHED_EVALUATION_SEED,
+    PUBLISHED_REPORTING_HORIZONS,
+    PUBLISHED_SOURCE_HORIZON,
+    PUBLISHED_TRAINING_SEED,
     policy_evaluation_batches,
-    published_horizons,
+    published_training_horizons,
     published_training_parameters,
     sample_mean_std,
     seed_everything,
@@ -46,6 +51,8 @@ def _validate_resume_result(
     dimension: int,
     activation: str,
     negative_slope: float,
+    expected_horizon: float,
+    smoke_test: bool = False,
 ) -> None:
     """Reject a checkpoint that does not match the requested experiment."""
     cfg = result.get("cfg", result.get("config"))
@@ -55,6 +62,40 @@ def _validate_resume_result(
         raise RuntimeError("Resume checkpoint has a different network activation.")
     if activation == "leaky_relu" and cfg.net.negative_slope != negative_slope:
         raise RuntimeError("Resume checkpoint has a different LeakyReLU slope.")
+    profile = published_training_parameters("dividend", "unlimited", dimension)
+    if not np.isclose(float(cfg.time.T), expected_horizon):
+        raise RuntimeError("Resume checkpoint has a different dividend horizon.")
+    expected_profile = (
+        (16, 2, 16, 8, 1)
+        if smoke_test
+        else (
+            profile["design_states"],
+            profile["rollouts_per_state"],
+            profile["randomized_candidates"],
+            profile["candidate_batch_size"],
+            profile["transfer_steps"],
+        )
+    )
+    actual_profile = (
+        int(cfg.design.N_k),
+        int(cfg.mc.M_k),
+        int(cfg.opt.n_global),
+        int(cfg.opt.n_global_batch),
+        int(cfg.net.transfer_steps),
+    )
+    if actual_profile != expected_profile or cfg.opt.min_rel_impulse is not None:
+        raise RuntimeError("Resume checkpoint has a different dividend training profile.")
+    if not smoke_test and not np.isclose(float(cfg.net.transfer_lr), profile["transfer_lr"]):
+        raise RuntimeError("Resume checkpoint has a different dividend transfer rate.")
+    if not np.isclose(float(cfg.design.x_max), 3.5):
+        raise RuntimeError("Resume checkpoint has a different dividend design domain.")
+    params = cfg.dividend
+    expected = {"mu": 0.5, "sigma": 0.3, "rho": 0.2, "lam": 0.2, "c": 0.05}
+    for name, target in expected.items():
+        value = getattr(params, name)
+        scalar = float(value.reshape(-1)[0].item()) if torch.is_tensor(value) else float(value)
+        if not np.isclose(scalar, target):
+            raise RuntimeError(f"Resume checkpoint has a different dividend {name}.")
 
 
 def train_limited(
@@ -71,7 +112,7 @@ def train_limited(
     """Train and save the bounded experiments for one dimension."""
     device = requested_device   # Computation device
     state_dim = dimension                                               # State dimension
-    T_fixed = 25.0                                              # Fixed maturity
+    T_fixed = PUBLISHED_SOURCE_HORIZON                           # Fixed maturity
     max_imp_list = [1, 2, 3, 4]                                 # Tested impulse budgets
     n_sim_eval = 25                                             # MC paths for policy evaluation
     dt_fine_eval = 2e-3                                         # Fine Euler step for evaluation
@@ -80,13 +121,15 @@ def train_limited(
     # Hyperparameters
 
     steps = 20_000                                              # Full training iterations
-    transfer_steps = 100                                        # Transfer learning iterations
+    transfer_steps = 500                                        # Transfer learning iterations
+    transfer_lr = 5e-4                                          # Transfer learning rate
     batch_size = 8192                                           # Training batch size
-    n_global = 5_000                                            # Random impulse candidates
+    published = published_training_parameters("dividend", "limited", state_dim)
+    n_global = int(published["randomized_candidates"])          # Random impulse candidates
     n_global_batch = 512                                        # Candidate batch size
-    min_rel_impulse = 0.4                                       # Sparsification threshold
-    N_k = 100_000 if state_dim == 1 else 12_500                 # Regression states per date
-    M_k = 1 if state_dim == 1 else 8                            # Rollouts averaged per state
+    min_rel_impulse = None                                      # Evaluate every coordinate mask
+    N_k = int(published["design_states"])                       # Regression states per date
+    M_k = int(published["rollouts_per_state"])                  # Rollouts averaged per state
 
     if smoke_test:
         steps = 2
@@ -100,7 +143,7 @@ def train_limited(
         n_sim_eval = 2
         dt_fine_eval = 0.1
     x_min = 0.0                                                 # Design domain lower bound
-    x_max = 8.0                                                 # Design domain upper bound
+    x_max = 3.5                                                 # Design domain upper bound
 
 
     # Unconstrained dividend ND (infinite impulses)
@@ -133,6 +176,7 @@ def train_limited(
             negative_slope=negative_slope,
             steps=steps,
             transfer_steps=transfer_steps,
+            transfer_lr=transfer_lr,
             batch_size=batch_size,
             use_zero_projection=True,
         ),
@@ -146,7 +190,8 @@ def train_limited(
         design=DesignConfig(
             N_k=N_k,
             x_min=0.0,
-            x_max=8.0,
+            x_max=x_max,
+            x_max_plot=x_max,
         ),
     )
 
@@ -158,9 +203,13 @@ def train_limited(
         all_results = loaded_bundle["bounded_results"]
         if loaded_unconstrained is None:
             raise RuntimeError("Resume checkpoint is missing its unconstrained result.")
-        _validate_resume_result(loaded_unconstrained, state_dim, activation, negative_slope)
+        _validate_resume_result(
+            loaded_unconstrained, state_dim, activation, negative_slope, T_fixed, smoke_test
+        )
         for result in all_results:
-            _validate_resume_result(result, state_dim, activation, negative_slope)
+            _validate_resume_result(
+                result, state_dim, activation, negative_slope, T_fixed, smoke_test
+            )
 
     res_inf_nd = loaded_unconstrained or train_dividend_unconstrained(cfg_inf, verbose=False)
 
@@ -268,6 +317,7 @@ def train_limited(
                 negative_slope=negative_slope,
                 steps=steps,
                 transfer_steps=transfer_steps,
+                transfer_lr=transfer_lr,
                 batch_size=batch_size,
                 use_zero_projection=True,
             ),
@@ -281,7 +331,8 @@ def train_limited(
             design=DesignConfig(
                 N_k=N_k,
                 x_min=0.0,
-                x_max=8.0,
+                x_max=x_max,
+                x_max_plot=x_max,
             ),
         )
 
@@ -411,7 +462,7 @@ def train_unlimited(
     """Train and save the unconstrained experiments for one dimension."""
     device = requested_device   # Computation device
     d_state = dimension                                                 # State dimension
-    T_list = list(horizons or published_horizons("unlimited", d_state))
+    T_list = list(horizons or published_training_horizons("unlimited", d_state))
     n_sim_eval = PUBLISHED_EVALUATION_PATHS                     # MC paths for policy evaluation
     evaluation_batch_size = PUBLISHED_EVALUATION_BATCH_SIZE     # Evaluation batch size
     evaluation_seed = PUBLISHED_EVALUATION_SEED                 # Evaluation base seed
@@ -421,13 +472,14 @@ def train_unlimited(
     # Hyperparameters
 
     steps = 20_000                                              # Full training iterations
-    transfer_steps = 100                                        # Transfer learning iterations
+    transfer_steps = 500                                        # Transfer learning iterations
     batch_size = 8192                                           # Training batch size
-    n_global = 5_000                                            # Random impulse candidates
+    published = published_training_parameters("dividend", "unlimited", d_state)
+    n_global = int(published["randomized_candidates"])          # Random impulse candidates
     n_global_batch = 512                                        # Candidate batch size
-    min_rel_impulse = 0.4                                       # Sparsification threshold
-    N_k = 100_000 if d_state == 1 else 12_500                   # Regression states per date
-    M_k = 1 if d_state == 1 else 8                              # Rollouts averaged per state
+    min_rel_impulse = None                                      # Evaluate every coordinate mask
+    N_k = int(published["design_states"])                       # Regression states per date
+    M_k = int(published["rollouts_per_state"])                  # Rollouts averaged per state
 
     if smoke_test:
         steps = 2
@@ -442,14 +494,24 @@ def train_unlimited(
         evaluation_batch_size = 2
         dt_fine_eval = 0.1
     x_min = 0.0                                                 # Design domain lower bound
-    x_max = 8.0                                                 # Design domain upper bound
+    x_max = 3.5                                                 # Design domain upper bound
 
     output_path = Path(output)
     if output_path.is_file():
         all_results = load_all_results_unlimited(output, map_location=device)
         for result in all_results:
-            _validate_resume_result(result, d_state, activation, negative_slope)
+            _validate_resume_result(
+                result,
+                d_state,
+                activation,
+                negative_slope,
+                float(result["T"]),
+                smoke_test,
+            )
     completed_horizons = {float(result["T"]) for result in all_results}
+    if not smoke_test and horizons is None and completed_horizons == set(PUBLISHED_REPORTING_HORIZONS):
+        print(f"Published dividend checkpoint already complete: {output}")
+        return
     unexpected = completed_horizons - set(T_list)
     if unexpected:
         raise RuntimeError(
@@ -526,7 +588,7 @@ def train_unlimited(
                 x_min=x_min,
                 x_max=x_max,
                 x_min_plot=0.0,
-                x_max_plot=2.0,
+                x_max_plot=x_max,
                 N_k=horizon_N_k,
             ),
         )
@@ -644,6 +706,17 @@ def train_unlimited(
 
         save_all_results_unlimited(output, all_results)
 
+    if horizons is None:
+        source_horizon = 1.0 if smoke_test else PUBLISHED_SOURCE_HORIZON
+        if len(all_results) != 1 or float(all_results[0]["T"]) != source_horizon:
+            raise RuntimeError("The dividend checkpoint requires one source model.")
+        all_results = build_reported_results(
+            all_results[0],
+            module=dividend_module,
+            application="dividend",
+            x_max=3.5,
+            smoke_test=smoke_test,
+        )
     save_all_results_unlimited(output, all_results)
 
 
@@ -655,11 +728,14 @@ def main() -> None:
     parser.add_argument("--dimension", type=int, required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", default="cuda:0" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--seed", type=int, default=1234)
+    parser.add_argument("--seed", type=int, default=PUBLISHED_TRAINING_SEED)
     parser.add_argument(
         "--horizons",
         type=_parse_horizons,
-        help="Comma-separated unlimited maturities; defaults to the published schedule.",
+        help=(
+            "Independently trained maturities. Omit this option for the published "
+            "T=10 recursion and its reported tail horizons."
+        ),
     )
     parser.add_argument(
         "--activation",
@@ -695,7 +771,7 @@ def main() -> None:
     schedule = (
         (1.0,)
         if args.smoke_test and args.mode == "unlimited"
-        else args.horizons or published_horizons(args.mode, args.dimension)
+        else args.horizons or published_training_horizons(args.mode, args.dimension)
     )
     candidates = 16 if args.smoke_test else int(
         published_training_parameters(

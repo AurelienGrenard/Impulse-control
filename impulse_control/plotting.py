@@ -267,7 +267,7 @@ def plot_unlimited_policy_consistency(
                 T_max=horizon,
                 n_paths=n_sim_band,
                 n_impulses_max=2000,
-                seed=1234,
+                seed=2345,
                 device=cfg.device,
                 absorb_at_zero=True,
             )
@@ -295,7 +295,7 @@ def plot_unlimited_policy_consistency(
                 T_max=horizon,
                 n_paths=n_sim_band,
                 n_impulses_max=2000,
-                seed=1234,
+                seed=2345,
                 device=cfg.device,
             )
 

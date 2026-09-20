@@ -27,14 +27,14 @@ Each notebook writes one canonical checkpoint to `retrained_runs/`, streams
 training progress and an ETA, and records logs and SHA-256 manifests. Existing
 completed work is reused.
 
-The unlimited notebooks use `T in {5,10,20,40}`, 120,000 rollouts per date,
-6,000 randomized candidates, and LeakyReLU with negative slope 0.01. Each
-maturity is trained independently with its recorded seed, saved under
-`retrained_runs/components/`, and then assembled into the canonical `.pt`
-file. Its learned policy is evaluated on 1,000 paths in seeded batches of 32.
-Limited notebooks use budgets `1,...,4` for both problems.
+All notebooks use seed 2345 and train one backward recursion with `T=K=10`.
+The unlimited notebooks then report `T in {2,4,6,8,10}` by retaining the final
+continuation networks of that recursion. Limited notebooks use budgets
+`1,...,4`. The dimension-dependent state and candidate counts are printed by
+the preflight cell before training starts.
 
-The exact source schedules are documented in
-`reproducibility/d1-checkpoint-sources.json` and
-`reproducibility/d6-checkpoint-sources.json`. Temporary training outputs are
-ignored by Git; only the curated checkpoints under `runs/` are published.
+The exact protocol is documented in
+`reproducibility/training-configurations.json`, and the published artifact
+provenance is recorded in `reproducibility/checkpoint-sources.json`. Temporary
+training outputs are ignored by Git; only curated checkpoints under `runs/`
+are published.

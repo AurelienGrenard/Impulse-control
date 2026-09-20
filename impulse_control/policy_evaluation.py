@@ -14,7 +14,11 @@ import torch
 
 from impulse_control.exact_dividend import solve_psi_dividend
 from impulse_control.exact_harvesting import solve_psi_general
-from impulse_control.reproducibility import policy_evaluation_batches, seed_everything
+from impulse_control.reproducibility import (
+    PUBLISHED_EVALUATION_SEED,
+    policy_evaluation_batches,
+    seed_everything,
+)
 from impulse_control.saving import load_all_results_unlimited
 
 
@@ -248,7 +252,7 @@ def evaluate_checkpoint(
         horizon = float(result["T"])
         n_paths = int(result.get("mc_n_NN", 1_000))
         batch_size = int(result.get("mc_batch_size_NN", 32))
-        base_seed = int(result.get("mc_seed_NN", 20_260_830))
+        base_seed = int(result.get("mc_seed_NN", PUBLISHED_EVALUATION_SEED))
         learned_parts = []
         band_parts = []
         started = time.perf_counter()

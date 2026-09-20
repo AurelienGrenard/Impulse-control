@@ -1,89 +1,65 @@
 {
+  "seed": 2345,
   "network": {
     "depth": 3,
     "width": 128,
     "activation": "leaky_relu",
     "negative_slope": 0.01,
-    "initial_steps": 20000,
+    "initial_adam_steps": 20000,
     "initial_learning_rate": 0.001,
+    "transfer_adam_steps": 500,
+    "transfer_learning_rate": 0.0005,
     "batch_size": 8192
   },
   "intervention_search": {
     "candidate_batch_size": 512,
-    "relative_sparsification_threshold": 0.4,
-    "postprocessing": "compare the best vector candidate with one thresholded candidate"
+    "procedure": "sample full vector candidates, select the best vector, evaluate all nonempty coordinate masks of that vector, retain the best masked action",
+    "d1_masks": 1,
+    "d4_masks": 15,
+    "d6_masks": 63
   },
-  "limited": {
-    "seed": 1234,
+  "allocations": {
     "d1": {
       "design_states": 100000,
-      "rollouts_per_state": 1
-    },
-    "d4": {
-      "design_states": 12500,
-      "rollouts_per_state": 8
-    },
-    "randomized_candidates": 5000,
-    "transfer_steps": 100,
-    "transfer_learning_rate": 0.001
-  },
-  "unlimited": {
-    "rollouts_per_date": 120000,
-    "randomized_candidates": 6000,
-    "transfer_steps": 500,
-    "transfer_learning_rate": 0.0005,
-    "d1": {
-      "design_states": 120000,
       "rollouts_per_state": 1,
-      "seed": 1234
+      "randomized_candidates": 12500
     },
-    "d6": {
-      "design_states": 15000,
-      "rollouts_per_state": 8
+    "limited_d4": {
+      "design_states": 200000,
+      "rollouts_per_state": 1,
+      "randomized_candidates": 50000
     },
-    "d6_component_seeds": {
-      "dividend": {
-        "T=5": 3456,
-        "T=10": 1234,
-        "T=20": 2345,
-        "T=40": 2345
-      },
-      "harvesting": {
-        "T=5": 1234,
-        "T=10": 3456,
-        "T=20": 2345,
-        "T=40": 2345
-      }
+    "unlimited_d6": {
+      "design_states": 350000,
+      "rollouts_per_state": 1,
+      "randomized_candidates": 75000
     }
   },
+  "parameters": {
+    "dividend": {"mu": 0.5, "sigma": 0.3, "rho": 0.2, "lambda": 0.2, "c": 0.05},
+    "harvesting": {"mu": 0.25, "sigma": 0.25, "rho": 0.2, "alpha": 1.0, "x0": 1.0, "lambda": 0.7, "c": 0.05}
+  },
+  "design_domains": {
+    "dividend": [0.0, 3.5],
+    "harvesting": [0.0, 2.0]
+  },
   "time_grid": {
-    "limited_horizon": 25,
+    "source_horizon": 10,
+    "source_dates": 10,
+    "reported_horizons": [2, 4, 6, 8, 10],
     "limited_budgets": [1, 2, 3, 4],
-    "unlimited_d1_horizons": [5, 10, 20, 40],
-    "unlimited_d6_horizons": [5, 10, 20, 40],
-    "decision_dates": "K=T",
+    "decision_dates": "annual",
     "training_euler_step": 0.01,
     "evaluation_euler_step": 0.002
   },
   "policy_evaluation": {
-    "learned_policy": {
-      "d1_paths": 1000,
-      "d6_paths": 1000,
-      "batch_size": 32,
-      "base_seed": 20260830,
-      "seed_rule": "base seed plus zero-based batch index",
-      "standard_deviation_ddof": 1
-    },
-    "band_policy_benchmark": {
-      "d1_paths": 1000,
-      "d6_paths": 1000,
-      "common_paths_with_learned_policy": true,
-      "base_seed": 20260830,
-      "seed_rule": "base seed plus zero-based batch index",
-      "decision_grid": "annual dates t_k=k",
-      "horizon_treatment": "stationary band rule truncated at T",
-      "standard_deviation_ddof": 1,
-      "archived_statistics": "reproducibility/policy-evaluation.csv"
-    }
+    "paths": 1000,
+    "batch_size": 32,
+    "base_seed": 20260924,
+    "seed_rule": "base seed plus zero-based batch index",
+    "common_paths": true,
+    "standard_deviation_ddof": 1,
+    "band_policy": "stationary band truncated at T and restricted to the annual grid",
+    "archived_statistics": "reproducibility/policy-evaluation.csv"
   }
 }

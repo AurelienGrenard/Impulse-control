@@ -1,0 +1,42 @@
+{
+  "training_seed": 2345,
+  "source_horizon": 10,
+  "source_dates": 10,
+  "reported_horizons": [2, 4, 6, 8, 10],
+  "reported_horizon_rule": "retain the final T continuation networks of the T=10 recursion and shift the time origin to zero",
+  "checkpoints": {
+    "dividend_limited_d1.pt": {
+      "source_sha256": "ac33a9717f56c9aa182906f105c1b1cb548c7b11d3511da2e891e281d5304eee",
+      "published_sha256": "ac33a9717f56c9aa182906f105c1b1cb548c7b11d3511da2e891e281d5304eee"
+    },
+    "dividend_limited_d4.pt": {
+      "source_sha256": "1277b62d416694c2d66cd035503467f01ee312b547d4e3642fed2feab7485c63",
+      "published_sha256": "1277b62d416694c2d66cd035503467f01ee312b547d4e3642fed2feab7485c63"
+    },
+    "dividend_unlimited_d1.pt": {
+      "source": "unconstrained component of dividend_limited_d1.pt",
+      "source_sha256": "ac33a9717f56c9aa182906f105c1b1cb548c7b11d3511da2e891e281d5304eee",
+      "published_sha256": "64521e427cc4f7437e352fe1b3efcf673fad067bf2c853d2c06a1d585ec5b1c1"
+    },
+    "dividend_unlimited_d6.pt": {
+      "source_sha256": "06ac3fe05fd7638343ce5b8d8f859d5ef0cc213ffa2a0919ef88b182bac976d1",
+      "published_sha256": "c25734eb2e46ee10de79ac1494e538b36944f19113b52ffe2c267eb55298bcfe"
+    },
+    "harvesting_limited_d1.pt": {
+      "source_sha256": "01073ce7dcea4bfa8f9bc8e666a29cd583a3c30b451bb516b2291f34a004ef24",
+      "published_sha256": "01073ce7dcea4bfa8f9bc8e666a29cd583a3c30b451bb516b2291f34a004ef24"
+    },
+    "harvesting_limited_d4.pt": {
+      "source_sha256": "569997f5eca9b72caffa3789a109d0368b7fb31fa717f2dfa0c58265a7b9a0c0",
+      "published_sha256": "569997f5eca9b72caffa3789a109d0368b7fb31fa717f2dfa0c58265a7b9a0c0"
+    },
+    "harvesting_unlimited_d1.pt": {
+      "source_sha256": "4fc25ad33790b2e045e284cd7fbe32bcb346e1db643bde53c3308eb63245adae",
+      "published_sha256": "10bc3e0c872b88b961ed9bcad5dcbadfe046f63230c4bf5804aca3cf55332cf2"
+    },
+    "harvesting_unlimited_d6.pt": {
+      "source_sha256": "a47e29776f03be8ca479f9fa99a828830c3ef75c265337cccd1ad394ab841b65",
+      "published_sha256": "c9cbf93aa90ba148190722b7803e7bfeeb9b71adcb85d850f1daff7447f03041"
+    }
+  }
+}

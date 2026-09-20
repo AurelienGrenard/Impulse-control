@@ -12,6 +12,7 @@ from impulse_control.reproducibility import (
     PUBLISHED_EVALUATION_PATHS,
     PUBLISHED_EVALUATION_SEED,
     PUBLISHED_MIN_REL_IMPULSE,
+    PUBLISHED_REPORTING_HORIZONS,
     policy_evaluation_batches,
     published_horizons,
     published_training_parameters,
@@ -73,7 +74,7 @@ def test_published_policy_evaluation_protocol():
     assert batches[0] == (PUBLISHED_EVALUATION_BATCH_SIZE, PUBLISHED_EVALUATION_SEED)
     assert batches[-1] == (8, PUBLISHED_EVALUATION_SEED + 31)
     assert sum(size for size, _ in batches) == PUBLISHED_EVALUATION_PATHS
-    assert value_diagnostic_seed(40) == PUBLISHED_EVALUATION_SEED + 100_040
+    assert value_diagnostic_seed(10) == PUBLISHED_EVALUATION_SEED + 100_010
     mean, std = sample_mean_std(np.array([1.0, 2.0, 3.0]))
     assert mean == 2.0
     assert np.isclose(std, 1.0)
@@ -86,35 +87,33 @@ def test_documented_numerical_protocol_matches_public_constants():
     )
     search = payload["intervention_search"]
     assert search["candidate_batch_size"] == 512
-    assert search["relative_sparsification_threshold"] == PUBLISHED_MIN_REL_IMPULSE
-    learned = payload["policy_evaluation"]["learned_policy"]
-    assert learned["d1_paths"] == PUBLISHED_EVALUATION_PATHS
-    assert learned["d6_paths"] == PUBLISHED_EVALUATION_PATHS
-    assert learned["batch_size"] == PUBLISHED_EVALUATION_BATCH_SIZE
-    assert learned["base_seed"] == PUBLISHED_EVALUATION_SEED
-    assert learned["standard_deviation_ddof"] == 1
+    assert "all nonempty coordinate masks" in search["procedure"]
+    evaluation = payload["policy_evaluation"]
+    assert evaluation["paths"] == PUBLISHED_EVALUATION_PATHS
+    assert evaluation["batch_size"] == PUBLISHED_EVALUATION_BATCH_SIZE
+    assert evaluation["base_seed"] == PUBLISHED_EVALUATION_SEED
+    assert evaluation["standard_deviation_ddof"] == 1
 
 
 def test_published_unlimited_schedule_matches_archived_components():
     """Check the profiles used by the selected unlimited maturities."""
-    dividend_t5 = published_training_parameters("dividend", "unlimited", 6, 5)
-    dividend_t10 = published_training_parameters("dividend", "unlimited", 6, 10)
-    harvesting_t5 = published_training_parameters("harvesting", "unlimited", 6, 5)
-    harvesting_t10 = published_training_parameters("harvesting", "unlimited", 6, 10)
-    for profile in (dividend_t5, dividend_t10, harvesting_t5, harvesting_t10):
-        assert profile["design_states"] == 15_000
-        assert profile["rollouts_per_state"] == 8
-        assert profile["randomized_candidates"] == 6_000
+    dividend = published_training_parameters("dividend", "unlimited", 6, 10)
+    harvesting = published_training_parameters("harvesting", "unlimited", 6, 10)
+    for profile in (dividend, harvesting):
+        assert profile["design_states"] == 350_000
+        assert profile["rollouts_per_state"] == 1
+        assert profile["randomized_candidates"] == 75_000
         assert profile["candidate_batch_size"] == 512
         assert profile["min_rel_impulse"] == PUBLISHED_MIN_REL_IMPULSE
+        assert profile["coordinate_masks"] == 63
         assert profile["transfer_steps"] == 500
         assert profile["transfer_lr"] == 5e-4
-    assert published_horizons("unlimited", 6) == (5.0, 10.0, 20.0, 40.0)
-    assert published_horizons("unlimited", 1) == (5.0, 10.0, 20.0, 40.0)
-    d1 = published_training_parameters("dividend", "unlimited", 1, 40)
-    assert d1["design_states"] == 120_000
+    assert published_horizons("unlimited", 6) == PUBLISHED_REPORTING_HORIZONS
+    assert published_horizons("unlimited", 1) == PUBLISHED_REPORTING_HORIZONS
+    d1 = published_training_parameters("dividend", "unlimited", 1, 10)
+    assert d1["design_states"] == 100_000
     assert d1["rollouts_per_state"] == 1
-    assert d1["randomized_candidates"] == 6_000
+    assert d1["randomized_candidates"] == 12_500
     assert d1["transfer_steps"] == 500
     assert d1["transfer_lr"] == 5e-4
 
@@ -144,7 +143,7 @@ def test_policy_evaluation_table_covers_every_unlimited_comparison():
         (application, dimension, horizon)
         for application in ("dividend", "harvesting")
         for dimension in (1, 6)
-        for horizon in (5, 10, 20, 40)
+        for horizon in map(int, PUBLISHED_REPORTING_HORIZONS)
     }
     assert {
         (row["problem"], int(row["d"]), int(row["T"])) for row in rows

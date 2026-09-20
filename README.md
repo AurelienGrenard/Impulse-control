@@ -1,49 +1,45 @@
 # Neural Regression and Randomized Optimization for Impulse Control
 
 This repository contains the code, pretrained checkpoints, and post-processing
-scripts required to reproduce the numerical experiments in *Neural Regression
-and Randomized Optimization for Impulse Control*.
+scripts for the numerical experiments in *Neural Regression and Randomized
+Optimization for Impulse Control*.
 
 Authors: Lokman Abbas Turki, Aurélien Grenard, Idris Kharroubi, Qinghua Li, and
 Antonio Ocello.
 
-## Artifact contents
+## Contents
 
 ```text
-impulse_control/          models, training algorithms, persistence, and plotting
-training_notebook/       one GPU training notebook per published checkpoint
-runs/                    eight pretrained LeakyReLU checkpoints stored with Git LFS
-figures/                 the 16 PNG panels used in the manuscript
+impulse_control/          models, algorithms, persistence, and plotting
+training_notebook/       one GPU training notebook per canonical checkpoint
+runs/                    eight pretrained checkpoints stored with Git LFS
+figures/                 the 16 panels used in the manuscript
 reproducibility/         checksums, configurations, provenance, and figure map
 tests/                   deterministic, checkpoint, and plotting tests
-tools/                   artifact verification and figure reproduction commands
+tools/                   verification, evaluation, and figure commands
 environment.yml          pinned reference environment
 ```
 
-Every network receives the full state in dimension `d`. The randomized search
-samples vector-valued impulses in dimension `d` and retains the best candidate.
-It then zeros coordinates whose relative state displacement is below `0.4` and
-keeps the better of the original and sparsified candidates. The
-multidimensional problem is never replaced by a sum of trained one-dimensional
-solutions.
+Every neural network receives the full state in dimension `d`. At each decision
+date, the intervention step samples full `d`-dimensional candidate vectors,
+selects the best vector, evaluates its `2^d-1` nonempty coordinate masks, and
+retains the best masked action. The multidimensional problem is not replaced by
+a sum of trained one-dimensional problems.
 
 ## Obtain the artifact
 
-The checkpoints use Git LFS and total approximately 236 MiB.
+The checkpoints use Git LFS and total approximately 84 MiB.
 
 ```bash
 git lfs install
-git clone --branch sisc-article-v1.0.4 --depth 1 \
+git clone --branch sisc-article-v1.0.5 --depth 1 \
   https://github.com/AurelienGrenard/Impulse-control.git
 cd Impulse-control
 git lfs pull
 sha256sum --check reproducibility/checkpoints.sha256
 ```
 
-The supplementary ZIP submitted with the paper must contain materialized
-checkpoint bytes, not Git LFS pointer files.
-
-## Reference environment
+## Environment
 
 ```bash
 conda env create -f environment.yml
@@ -51,135 +47,117 @@ conda activate impulse-control-sisc
 python -m pip install --no-deps -e .
 ```
 
-The pinned environment uses Python 3.11.9, PyTorch 2.3.1, CUDA 12.1,
-NumPy 1.26.4, SciPy 1.13.1, and Matplotlib 3.8.4. Checkpoint loading,
-validation, and figure generation run on CPU. Full training requires a
-CUDA-capable GPU.
+The reference environment pins Python 3.11.9, PyTorch 2.3.1, CUDA 12.1,
+NumPy 1.26.4, SciPy 1.13.1, and Matplotlib 3.8.4. Checkpoint validation and
+plots that do not simulate learned policies run on CPU. Full training and the
+controlled-path panels require a CUDA-capable GPU.
 
-## Reproduce the paper figures
+## Reproduce the results
+
+Verify the distributed artifact and run the tests:
 
 ```bash
 python tools/verify_artifacts.py
 python -m pytest -q
-MPLBACKEND=Agg CUDA_VISIBLE_DEVICES='' python tools/reproduce_figures.py
 ```
 
-The last command regenerates the 16 manuscript panels from the supplied
-checkpoints and archived policy-evaluation statistics, without retraining. The
-exact correspondence is recorded in
-[`reproducibility/figure-map.csv`](reproducibility/figure-map.csv).
-
-To recompute the common-path policy statistics before regenerating the figures,
-run on a CUDA-capable machine:
+Regenerate all 16 manuscript panels:
 
 ```bash
-python tools/evaluate_policy_comparison.py --device cuda
+MPLBACKEND=Agg python tools/reproduce_figures.py --device cuda:0
+```
+
+The exact panel-to-checkpoint correspondence is recorded in
+[`reproducibility/figure-map.csv`](reproducibility/figure-map.csv). To recompute
+the common-path learned-versus-band comparisons before plotting, run:
+
+```bash
+python tools/evaluate_policy_comparison.py --device cuda:0
 ```
 
 | Figure | Numerical diagnostics |
 |---|---|
-| Fig. 1 | Unlimited dividend and harvesting problems, `d=1` |
-| Fig. 2 | Finite-budget values and controlled paths for both problems, `d=1` |
-| Fig. 3 | Dividend finite-budget paths, `d=4` |
-| Fig. 4 | Unlimited dividend and harvesting problems, `d=6` |
+| Fig. 1 | Value functions for both problems in `d=1` and `d=6` |
+| Fig. 2 | Finite-budget values and paths for both problems in `d=1` |
+| Fig. 3 | Finite-budget dividend paths in `d=4` |
+| Fig. 4 | Learned and grid-restricted band policies in `d=1` and `d=6` |
 
-## Published numerical configuration
+## Published configuration
 
-The model parameters are:
+The componentwise model parameters are:
 
-- dividend: `mu=1`, `sigma=0.5`, `rho=0.05`, `lambda=0.2`, `c=0.5`;
-- harvesting: `mu=0.25`, `sigma=0.25`, `rho=0.05`, `alpha=1`, `x0=1`,
-  `lambda=0.7`, `c=0.7`.
+- dividends: `mu=0.5`, `sigma=0.3`, `rho=0.2`, `lambda=0.2`, `c=0.05`;
+- harvesting: `mu=0.25`, `sigma=0.25`, `rho=0.2`, `alpha=1`, `x0=1`,
+  `lambda=0.7`, `c=0.05`.
 
 All continuation networks have three hidden layers of width 128, LeakyReLU
 activation with negative slope `0.01`, and one scalar output. Initial fits use
-20,000 Adam steps with learning rate `1e-3` and batch size 8,192. Randomized
-impulse candidates are processed in batches of 512. The relative displacement
-threshold used to construct the single sparsified candidate is `0.4`.
+20,000 Adam steps with learning rate `1e-3` and batch size 8,192. Transfer fits
+use 500 Adam steps with learning rate `5e-4`. All experiments use one rollout
+per design state and seed 2345.
 
-For limited experiments:
+The dimension-dependent allocations are:
 
-- `(N_k,M_k)=(100000,1)` in `d=1` and `(12500,8)` in `d=4`;
-- 5,000 randomized impulse candidates;
-- 100 Adam steps per date under transfer learning, with learning rate `1e-3`;
-- seed 1234.
+| Experiment | Design states `N_k` | Randomized candidates |
+|---|---:|---:|
+| `d=1` | 100,000 | 12,500 |
+| finite budget, `d=4` | 200,000 | 50,000 |
+| no finite budget, `d=6` | 350,000 | 75,000 |
 
-For unlimited experiments in both `d=1` and `d=6`:
+Training uses the annual decision grid `t_k=k`, `k=0,...,10`, a training Euler
+step of `1e-2`, and one backward recursion with `T=K=10`. For the
+time-homogeneous unlimited experiments, the plots at `T in {2,4,6,8,10}` retain
+the last `T` continuation networks and shift the time origin to zero. The
+finite-budget experiments use budgets `1,...,4` at `T=10`.
 
-- `(N_k,M_k)=(120000,1)` in `d=1` and `(15000,8)` in `d=6`, hence
-  120,000 rollouts per date;
-- 6,000 randomized impulse candidates;
-- 500 Adam steps per date under transfer learning, with learning rate `5e-4`;
-- horizons `T in {5,10,20,40}`.
+Policy comparisons use 1,000 common Brownian paths in batches of 32, base seed
+20260924, and Euler step `2e-3`. The stationary band rule is truncated at the
+reported maturity and applied only at the same annual dates as the learned
+policy. Aggregate statistics are archived in
+[`reproducibility/policy-evaluation.csv`](reproducibility/policy-evaluation.csv).
 
-Limited experiments use `T=25` and budgets `1,...,4` for both problems. In
-every experiment, `K=T`, the training Euler step is `1e-2`, and the evaluation
-Euler step is `2e-3`.
+The complete machine-readable protocol is in
+[`reproducibility/training-configurations.json`](reproducibility/training-configurations.json),
+and checkpoint provenance is in
+[`reproducibility/checkpoint-sources.json`](reproducibility/checkpoint-sources.json).
 
-The selected unlimited bundles combine independently trained maturities. Their
-exact seeds and component checksums are recorded in
-[`reproducibility/d1-checkpoint-sources.json`](reproducibility/d1-checkpoint-sources.json)
-and
-[`reproducibility/d6-checkpoint-sources.json`](reproducibility/d6-checkpoint-sources.json).
-All other settings are serialized in each checkpoint and summarized in
-[`reproducibility/training-configurations.json`](reproducibility/training-configurations.json).
+## Retrain
 
-Unlimited-policy comparisons use 1,000 common Brownian paths in batches of 32,
-with base seed `20260830` incremented once per batch. The stationary
-infinite-horizon band rule is truncated at the reported maturity and applied
-only at the same annual decision dates as the learned policy. The resulting
-statistics are archived in `reproducibility/policy-evaluation.csv`. Figure
-error bars are marginal 95% Monte Carlo confidence intervals.
-
-## Retrain the experiments
-
-The eight notebooks under [`training_notebook/`](training_notebook/) each
-produce one canonical `.pt` file in `retrained_runs/`, display progress and an
-ETA, and can resume completed components. The unlimited notebooks train the
-four selected maturity/seed pairs independently and then assemble the final
-checkpoint.
+The eight notebooks under [`training_notebook/`](training_notebook/) each write
+one checkpoint to `retrained_runs/`, stream progress and an ETA, and record a
+SHA-256 manifest. They default to `cuda:0` and can resume an interrupted run.
 
 The same entry points can be called directly. For example:
 
 ```bash
 python -m impulse_control.train_dividend \
-  --mode limited --dimension 1 --seed 1234 \
-  --output reproduced_runs/dividend_limited_d1.pt --progress
+  --mode limited --dimension 4 --seed 2345 \
+  --output retrained_runs/dividend_limited_d4.pt --progress
 
-python -m impulse_control.train_dividend \
-  --mode unlimited --dimension 6 --horizons 5 --seed 3456 \
-  --output reproduced_runs/components/dividend_d6_seed3456_T005.pt --progress
+python -m impulse_control.train_harvesting \
+  --mode unlimited --dimension 6 --seed 2345 \
+  --output retrained_runs/harvesting_unlimited_d6.pt --progress
 ```
 
-Omitting `--horizons` uses the published maturity schedule for the requested
-dimension. Pass `--smoke-test --device cpu` to exercise the complete pipeline
-with tiny validation sizes. Smoke-test outputs are not paper results.
+Without `--horizons`, unlimited training performs the published `T=10`
+recursion and constructs the five reported maturities from its continuation
+networks. Pass `--smoke-test --device cpu` to exercise the complete pipeline
+with tiny validation sizes. Fixed seeds reproduce the protocol, although GPU
+weights need not be byte-identical across architectures and software stacks.
 
-Fixed seeds make the experiment protocol reproducible, but independently
-retrained GPU weights need not be byte-identical across GPU architectures and
-software stacks. The supplied checkpoints are the immutable artifacts used to
-produce the committed figures.
-
-## Validation and integrity
+## Integrity and supplementary archive
 
 ```bash
 python -m compileall -q impulse_control tools
 python tools/verify_artifacts.py
-python -m pytest -q
-```
-
-`reproducibility/checkpoints.sha256` identifies the exact pretrained files.
-Create a materialized supplementary snapshot with:
-
-```bash
 python tools/create_sisc_archive.py
 ```
 
-The command rejects Git LFS pointers and writes an internal SHA-256 manifest.
-The generated ZIP under `dist/` is ignored by Git and is intended for direct
-upload to the journal or an archival repository.
+The archive command rejects Git LFS pointers and creates a materialized ZIP
+with an internal SHA-256 manifest. The generated file under `dist/` is ignored
+by Git and can be uploaded as supplementary material.
 
 ## Citation
 
 Citation metadata are provided in [`CITATION.cff`](CITATION.cff). Publication
-metadata and the DOI should be added after acceptance.
+metadata and the DOI can be added after acceptance.

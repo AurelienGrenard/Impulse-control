@@ -15,19 +15,29 @@ import scipy
 import torch
 
 
-PUBLISHED_MIN_REL_IMPULSE = 0.4
+PUBLISHED_MIN_REL_IMPULSE = None
 PUBLISHED_EVALUATION_PATHS = 1_000
 PUBLISHED_EVALUATION_BATCH_SIZE = 32
-PUBLISHED_EVALUATION_SEED = 20_260_830
+PUBLISHED_EVALUATION_SEED = 20_260_924
+PUBLISHED_TRAINING_SEED = 2_345
+PUBLISHED_SOURCE_HORIZON = 10.0
+PUBLISHED_REPORTING_HORIZONS = (2.0, 4.0, 6.0, 8.0, 10.0)
 
 
 def published_horizons(mode: str, dimension: int) -> tuple[float, ...]:
-    """Return the maturity schedule used by the published checkpoint."""
+    """Return the maturities reported from the published checkpoints."""
     if mode == "limited":
-        return (25.0,)
+        return (PUBLISHED_SOURCE_HORIZON,)
     if mode != "unlimited":
         raise ValueError(f"Unsupported mode: {mode}")
-    return (5.0, 10.0, 20.0, 40.0)
+    return PUBLISHED_REPORTING_HORIZONS
+
+
+def published_training_horizons(mode: str, dimension: int) -> tuple[float, ...]:
+    """Return the horizons that require an independent backward recursion."""
+    if mode not in {"limited", "unlimited"}:
+        raise ValueError(f"Unsupported mode: {mode}")
+    return (PUBLISHED_SOURCE_HORIZON,)
 
 
 def published_training_parameters(
@@ -37,23 +47,28 @@ def published_training_parameters(
     horizon: float | None = None,
 ) -> dict[str, int | float | None]:
     """Return the numerical settings used by a published checkpoint component."""
+    if application not in {"dividend", "harvesting"}:
+        raise ValueError(f"Unsupported application: {application}")
+    if mode not in {"limited", "unlimited"}:
+        raise ValueError(f"Unsupported mode: {mode}")
+    profiles = {
+        1: (100_000, 12_500),
+        4: (200_000, 50_000),
+        6: (350_000, 75_000),
+    }
+    if dimension not in profiles:
+        raise ValueError(f"No published profile for dimension {dimension}.")
+    design_states, randomized_candidates = profiles[dimension]
     parameters: dict[str, int | float | None] = {
-        "design_states": 100_000 if dimension == 1 else 12_500,
-        "rollouts_per_state": 1 if dimension == 1 else 8,
-        "randomized_candidates": 5_000,
+        "design_states": design_states,
+        "rollouts_per_state": 1,
+        "randomized_candidates": randomized_candidates,
         "candidate_batch_size": 512,
         "min_rel_impulse": PUBLISHED_MIN_REL_IMPULSE,
-        "transfer_steps": 100,
-        "transfer_lr": None,
+        "coordinate_masks": (1 << dimension) - 1,
+        "transfer_steps": 500,
+        "transfer_lr": 5e-4,
     }
-    if mode == "unlimited":
-        parameters.update(
-            design_states=120_000 if dimension == 1 else 15_000,
-            rollouts_per_state=1 if dimension == 1 else 8,
-            randomized_candidates=6_000,
-            transfer_steps=500,
-            transfer_lr=5e-4,
-        )
     return parameters
 
 
@@ -138,13 +153,14 @@ def write_run_manifest(
         },
     }
     if mode == "unlimited":
-        schedule = horizons or published_horizons(mode, dimension)
+        schedule = horizons or published_training_horizons(mode, dimension)
         payload["policy_evaluation"] = {
             "paths": 2 if smoke_test else PUBLISHED_EVALUATION_PATHS,
             "batch_size": 2 if smoke_test else PUBLISHED_EVALUATION_BATCH_SIZE,
             "seed": PUBLISHED_EVALUATION_SEED,
             "standard_deviation_ddof": 1,
         }
+        payload["reported_horizons"] = list(PUBLISHED_REPORTING_HORIZONS)
         payload["horizon_parameters"] = {
             f"T={horizon:g}": published_training_parameters(
                 application, mode, dimension, horizon

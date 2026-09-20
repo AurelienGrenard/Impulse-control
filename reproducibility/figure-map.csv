@@ -1,8 +1,8 @@
 article_figure,panel,problem,mode,dimension,checkpoint,statistics,output
 1,top_left,dividend,unlimited,1,runs/dividend_unlimited_d1.pt,,figures/dividend_unlimited_d1_value_functions.png
-1,top_right,dividend,unlimited,1,runs/dividend_unlimited_d1.pt,reproducibility/policy-evaluation.csv,figures/dividend_unlimited_d1_policy_consistency.png
+1,top_right,dividend,unlimited,6,runs/dividend_unlimited_d6.pt,,figures/dividend_unlimited_d6_value_functions.png
 1,bottom_left,harvesting,unlimited,1,runs/harvesting_unlimited_d1.pt,,figures/harvesting_unlimited_d1_value_functions.png
-1,bottom_right,harvesting,unlimited,1,runs/harvesting_unlimited_d1.pt,reproducibility/policy-evaluation.csv,figures/harvesting_unlimited_d1_policy_consistency.png
+1,bottom_right,harvesting,unlimited,6,runs/harvesting_unlimited_d6.pt,,figures/harvesting_unlimited_d6_value_functions.png
 2,top_left,dividend,limited,1,runs/dividend_limited_d1.pt,,figures/dividend_limited_d1_value_functions.png
 2,top_right,dividend,limited,1,runs/dividend_limited_d1.pt,,figures/dividend_limited_d1_path_coordinate_1.png
 2,bottom_left,harvesting,limited,1,runs/harvesting_limited_d1.pt,,figures/harvesting_limited_d1_value_functions.png
@@ -11,7 +11,7 @@ article_figure,panel,problem,mode,dimension,checkpoint,statistics,output
 3,coordinate_2,dividend,limited,4,runs/dividend_limited_d4.pt,,figures/dividend_limited_d4_path_coordinate_2.png
 3,coordinate_3,dividend,limited,4,runs/dividend_limited_d4.pt,,figures/dividend_limited_d4_path_coordinate_3.png
 3,coordinate_4,dividend,limited,4,runs/dividend_limited_d4.pt,,figures/dividend_limited_d4_path_coordinate_4.png
-4,top_left,dividend,unlimited,6,runs/dividend_unlimited_d6.pt,,figures/dividend_unlimited_d6_value_functions.png
+4,top_left,dividend,unlimited,1,runs/dividend_unlimited_d1.pt,reproducibility/policy-evaluation.csv,figures/dividend_unlimited_d1_policy_consistency.png
 4,top_right,dividend,unlimited,6,runs/dividend_unlimited_d6.pt,reproducibility/policy-evaluation.csv,figures/dividend_unlimited_d6_policy_consistency.png
-4,bottom_left,harvesting,unlimited,6,runs/harvesting_unlimited_d6.pt,,figures/harvesting_unlimited_d6_value_functions.png
+4,bottom_left,harvesting,unlimited,1,runs/harvesting_unlimited_d1.pt,reproducibility/policy-evaluation.csv,figures/harvesting_unlimited_d1_policy_consistency.png
 4,bottom_right,harvesting,unlimited,6,runs/harvesting_unlimited_d6.pt,reproducibility/policy-evaluation.csv,figures/harvesting_unlimited_d6_policy_consistency.png

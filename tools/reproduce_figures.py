@@ -10,6 +10,7 @@ import sys
 import warnings
 
 import matplotlib.pyplot as plt
+import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -53,7 +54,7 @@ def policy_comparison_rows(application: str, dimension: int):
     ]
 
 
-def reproduce_one(stem: str, output_dir: Path) -> None:
+def reproduce_one(stem: str, output_dir: Path, device: str) -> None:
     """Regenerate the figures associated with one checkpoint."""
     warnings.filterwarnings(
         "ignore",
@@ -65,7 +66,7 @@ def reproduce_one(stem: str, output_dir: Path) -> None:
     dimension = int(dimension_text[1:])
     checkpoint = ROOT / "runs" / f"{stem}.pt"
     if mode == "limited":
-        bundle = load_results_bundle(str(checkpoint), map_location="cpu")
+        bundle = load_results_bundle(str(checkpoint), map_location=device)
         count = 0
         if stem in LIMITED_VALUE_EXPERIMENTS:
             plot_limited_summary(
@@ -76,16 +77,20 @@ def reproduce_one(stem: str, output_dir: Path) -> None:
             plt.close("all")
             count += 1
         if stem in LIMITED_PATH_EXPERIMENTS:
-            seed = 124 if stem == "dividend_limited_d1" else 123
+            seeds = {
+                "dividend_limited_d1": 125,
+                "harvesting_limited_d1": 1,
+                "dividend_limited_d4": 143,
+            }
             figures = plot_limited_paths(
                 bundle,
-                seed=seed,
+                seed=seeds[stem],
                 output_prefix=str(output_dir / stem),
                 show=False,
             )
             count += len(figures)
     else:
-        results = load_all_results_unlimited(str(checkpoint), map_location="cpu")
+        results = load_all_results_unlimited(str(checkpoint), map_location=device)
         plot_unlimited_summary(
             results,
             output=str(output_dir / f"{stem}_value_functions.png"),
@@ -103,10 +108,10 @@ def reproduce_one(stem: str, output_dir: Path) -> None:
     print(f"generated {application} {mode} d={dimension}: {count} figure(s)")
 
 
-def reproduce(output_dir: Path) -> None:
+def reproduce(output_dir: Path, device: str) -> None:
     """Regenerate all figures while releasing each checkpoint before the next."""
     for stem in EXPERIMENTS:
-        reproduce_one(stem, output_dir)
+        reproduce_one(stem, output_dir, device)
         gc.collect()
 
 
@@ -115,11 +120,16 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", type=Path, default=ROOT / "figures")
     parser.add_argument("--experiment", choices=EXPERIMENTS)
+    parser.add_argument(
+        "--device",
+        default="cuda:0" if torch.cuda.is_available() else "cpu",
+        help="Device used for the randomized policy evaluations.",
+    )
     args = parser.parse_args()
     if args.experiment:
-        reproduce_one(args.experiment, args.output_dir.resolve())
+        reproduce_one(args.experiment, args.output_dir.resolve(), args.device)
     else:
-        reproduce(args.output_dir.resolve())
+        reproduce(args.output_dir.resolve(), args.device)
 
 
 if __name__ == "__main__":

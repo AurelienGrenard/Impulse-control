@@ -14,6 +14,6 @@ authors:
   - family-names: Ocello
     given-names: Antonio
 repository-code: "https://github.com/AurelienGrenard/Impulse-control"
-version: 1.0.5
-date-released: 2026-09-20
+version: 1.0.6
+date-released: 2026-09-23
 license: BSD-3-Clause

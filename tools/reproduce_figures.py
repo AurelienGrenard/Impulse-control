@@ -82,9 +82,15 @@ def reproduce_one(stem: str, output_dir: Path, device: str) -> None:
                 "harvesting_limited_d1": 1,
                 "dividend_limited_d4": 143,
             }
+            initial_states = {
+                "dividend_limited_d1": 0.55,
+                "harvesting_limited_d1": 1.0,
+                "dividend_limited_d4": 0.55,
+            }
             figures = plot_limited_paths(
                 bundle,
                 seed=seeds[stem],
+                initial_state=initial_states[stem],
                 output_prefix=str(output_dir / stem),
                 show=False,
             )

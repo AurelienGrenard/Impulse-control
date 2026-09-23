@@ -376,10 +376,11 @@ def plot_limited_paths(
     *,
     seed: int = 123,
     dt_fine: float = 2e-3,
+    initial_state: float = 1.0,
     output_prefix: Optional[str] = None,
     show: bool = True,
 ):
-    """Plot shared-Brownian controlled paths without exposing bundle internals."""
+    """Plot shared-Brownian paths from one common diagonal initial state."""
     seed_everything(seed)
     use_white_style()
     unlimited = bundle["unconstrained"]
@@ -389,7 +390,12 @@ def plot_limited_paths(
     module = __import__(f"impulse_control.{application}", fromlist=["EulerStepper"])
     params = getattr(cfg, application)
     dimension = int(params.state_dim)
-    x0 = torch.ones((1, dimension), device=cfg.device, dtype=cfg.dtype)
+    x0 = torch.full(
+        (1, dimension),
+        float(initial_state),
+        device=cfg.device,
+        dtype=cfg.dtype,
+    )
     noise = module.precompute_euler_noise(
         t_grid=unlimited["t_grid"],
         n_sim=1,

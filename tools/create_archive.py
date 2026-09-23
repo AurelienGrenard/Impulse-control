@@ -1,4 +1,4 @@
-"""Create a materialized ZIP snapshot for the SISC supplementary materials."""
+"""Create a materialized ZIP snapshot for the manuscript supplementary materials."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ARCHIVE_ROOT = "Impulse-control-SISC"
+ARCHIVE_ROOT = "Impulse-control-reproducibility"
 LFS_HEADER = b"version https://git-lfs.github.com/spec/v1"
 
 
@@ -39,7 +39,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=ROOT / "dist" / "Impulse-control-SISC-reproducibility.zip",
+        default=ROOT / "dist" / "Impulse-control-reproducibility.zip",
     )
     args = parser.parse_args()
     output = args.output.resolve()

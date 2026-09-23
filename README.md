@@ -32,7 +32,7 @@ The checkpoints use Git LFS and total approximately 84 MiB.
 
 ```bash
 git lfs install
-git clone --branch sisc-article-v1.0.6 --depth 1 \
+git clone --branch article-v1.0.7 --depth 1 \
   https://github.com/AurelienGrenard/Impulse-control.git
 cd Impulse-control
 git lfs pull
@@ -43,7 +43,7 @@ sha256sum --check reproducibility/checkpoints.sha256
 
 ```bash
 conda env create -f environment.yml
-conda activate impulse-control-sisc
+conda activate impulse-control-repro
 python -m pip install --no-deps -e .
 ```
 
@@ -150,7 +150,7 @@ weights need not be byte-identical across architectures and software stacks.
 ```bash
 python -m compileall -q impulse_control tools
 python tools/verify_artifacts.py
-python tools/create_sisc_archive.py
+python tools/create_archive.py
 ```
 
 The archive command rejects Git LFS pointers and creates a materialized ZIP

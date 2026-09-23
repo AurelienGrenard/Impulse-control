@@ -1,4 +1,4 @@
-name: impulse-control-sisc
+name: impulse-control-repro
 channels:
   - pytorch
   - nvidia

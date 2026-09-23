@@ -13,7 +13,7 @@ same checkout:
 
 ```bash
 conda env create -f environment.yml
-conda activate impulse-control-sisc
+conda activate impulse-control-repro
 python -m pip install --no-deps -e .
 jupyter notebook
 ```

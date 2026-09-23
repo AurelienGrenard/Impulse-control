@@ -1,4 +1,4 @@
-"""Verify the integrity and completeness of the SISC companion artifact."""
+"""Verify the integrity and completeness of the manuscript companion artifact."""
 
 from __future__ import annotations
 
